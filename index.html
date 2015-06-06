@@ -81,7 +81,7 @@ function initialize() {
 	var filename = "data/all_sf_paths.txt"
 
 	loadFileAsJSON(filename, null, function(json) {
-		console.log("loaded paths - 3134");
+		console.log("loaded paths - small elevs");
 		drawNewLines(json);
 	});
 	
@@ -288,7 +288,7 @@ function drawNewLines(json) {
 	// drawElevations();
 	
 	// DO IT using data loaded from external file
-	var filename = "data/elevations_some.txt"
+	var filename = "data/small_elevations_first.txt"
 
 	loadFileAsJSON(filename, null, function(json) {
 		console.log("loaded elevations for paths whoo hoo with arrows")
