@@ -184,7 +184,7 @@
 <script src="http://maps.googleapis.com/maps/api/js?sensor=true&libraries=geometry,places"></script>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
 <script src="resources/infobox_packed.js"></script>
-<script src="data/loadLines.js"></script>
+<!-- <script src="data/loadLines.js"></script> -->
 
 <script type="text/javascript">
 
@@ -244,9 +244,14 @@ function initialize() {
 	
 	loadData();
 	loadJSON(data);
-	drawNewLines();
 	updateGradeLineVisibility();
 	activateGradeLines();
+	
+	var filename = "data/lines_sample.txt"
+	
+	loadFileAsJSON(filename, null, function(json) {
+		drawNewLines(json);
+	});
 }
 
 
@@ -367,15 +372,29 @@ function setUpMap() {
 	});
 }
 
-function drawNewLines() {
-	
-	loadLines();
+function loadFileAsJSON(filename, cache, callback) {
+	$.ajax({
+		url: filename,
+		async: true,
+		success: function(result) {
+			callback(JSON.parse(result));
+		}
+	});
+}
+
+function drawNewLines(lines) {
+	// lines should be JSON
+		
+	// loadLines();
+	// lines = data/lines_sample.txt
+
 	var elevationLocations = [];
 	for (var i=0; i<lines.length; i++) {
+		console.log("i: " + i)
 		var path = [];
 		
 		// find the points we need elevations for
-		for (var j=0; j<25; j++) {
+		for (var j=0; j<lines[i].length; j++) {
 
 			var currLocation = new google.maps.LatLng(lines[i][j][1], lines[i][j][0]);
 			path[j] = currLocation;
