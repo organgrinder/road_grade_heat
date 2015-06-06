@@ -441,6 +441,7 @@ function drawNewLines(lines) {
 		if (status != google.maps.ElevationStatus.OK) {
 			// something went wrong with the elevation request
 			console.log("problem with request");
+			console.log(status);
 			$('#elev_info').html(status);
 		} else {
 			for (var i=0; i<results.length-1; i++) {
