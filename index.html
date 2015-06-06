@@ -292,7 +292,6 @@ function drawNewLines(json) {
 	var filename = "data/test_data.txt"
 
 	loadFileAsJSON(filename, null, function(json) {
-		console.log("json loaded" + json);
 		atlas.elevationPoints = json;
 		drawElevations();
 	});
