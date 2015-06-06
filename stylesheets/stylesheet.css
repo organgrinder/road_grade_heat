@@ -1,0 +1,169 @@
+html {
+	width: 100%;
+height: 100%;
+}
+body {
+	width: 100%;
+height: 100%;
+margin: 0;
+padding: 0;
+font-family: Helvetica, sans-serif;
+font-size: 13px;
+}
+div#header { 
+	height: 34px;
+	background-color: #fafbfc;
+border-bottom: 1px solid #999;
+display: none;
+}
+div#header_left {
+	float: left;
+padding: 9px 0px 0px 100px;
+font-size: 16px;
+font-weight: bold;
+}
+div#header_twitter {
+	float: right;
+padding: 7px 8px 5px 0px;
+}
+div#header_facebook {
+	float: right;
+padding: 7px 30px 5px 0px;
+}
+div#map_canvas { 
+	position: absolute;
+	top: 35px;
+	right: 0px;
+	bottom: 0px;
+	left: 0px;
+}
+div#control_box_mobile {
+border: 1px solid #999;
+width: 115px;
+top: 5px;
+margin-left: 5px;
+position: absolute;
+background-color: #FFF;
+opacity: 0.9;
+padding: 8px 0px 4px 10px;
+display: none;
+}
+div#control_box {
+border: 1px solid #999;
+width: 240px;
+top: 55px;
+margin-left: 90px;
+position: absolute;
+background-color: #FFF;
+opacity: 0.9;
+padding: 8px 10px 8px 15px;
+display: none;
+}
+div#image-bg {
+position: fixed;
+width: 360;
+height: 640px;
+bottom: 0px;
+right: 0px;
+display: none;
+}
+div#instructions_mobile { 
+	position: absolute;
+	font-size: 16px;
+	width: 240px;
+	top: 0px;
+	left: 0px;
+	padding: 5px;
+	background-color: #FFF;
+border: 1px solid #000;
+	opacity: 0.9;
+	padding: 15px 0px 15px 20px;
+	display: none;
+}
+div {
+margin-bottom: 0px;	  
+}
+.title {
+font-size: 14px;
+font-weight: bolder;
+margin-bottom: 8px;
+text-align: center;
+}
+.descript {
+font-weight: bold;
+}
+ol {
+padding-left: inherit;
+margin-bottom: 0px;
+}
+ol.mobile {
+padding-left: 20px;
+}
+li {
+margin-bottom: 6px;
+}
+a {
+cursor: pointer;
+color: #08519c;
+text-decoration: none;
+}
+#show {
+display: none;
+}
+hr {
+margin-bottom: 5px;
+}
+#actions {
+	text-align: left;
+margin-bottom: 5px;
+}
+.action_mobile {
+	text-align: left;
+margin-bottom: 5px;
+}
+.star {
+  color: #08519c;
+opacity: 0.8;
+}
+#search {
+font-weight: bold;
+margin-bottom: 5px;
+}
+#search_box {
+margin-left: 0px;
+display: table-cell; 
+width: 96%;
+}
+#instructions {
+	font-size: 12px;
+	text-align: left;
+margin-bottom: 5px;
+}
+#detect {
+	text-align: left;
+margin-bottom: 5px;
+}
+#footer {
+font-size: 11px;
+text-align: right;
+margin-bottom: 0px;
+}
+div#alert {
+	position: absolute;
+border: 2px solid #000;
+top: 0px;
+left: 0px;
+width: 320px;
+background-color: #FFF;
+padding: 10px 12px;
+display: none;
+}
+div#alert-left {
+float: left;
+width: 270px; 
+font-size: 14px;
+}
+div#alert-right {
+float: right;
+padding-top: 0px;
+}
