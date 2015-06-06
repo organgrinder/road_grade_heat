@@ -285,16 +285,16 @@ function drawNewLines(json) {
 	}
 	
 	// DO IT using sample from this file
-	atlas.elevationPoints = localElevations;
-	drawElevations();
+	// atlas.elevationPoints = localElevations;
+	// drawElevations();
 	
 	// DO IT using data loaded from external file
 	var filename = "data/test_data.txt"
 
 	loadFileAsJSON(filename, null, function(json) {
 		console.log("json loaded" + json);
-		// atlas.elevationPoints = json;
-		// drawElevations();
+		atlas.elevationPoints = json;
+		drawElevations();
 	});
 	
 	
