@@ -1,0 +1,1004 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<title>Hill Mapper San Francisco</title>
+<meta name="description" content="Colors show which streets go uphill or downhill from your location, and their steepness." />
+<meta name="author" content="Samuel Maurer" />
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+<link rel="image_src" href="resources/thumbnail.png" />
+<link rel="image_src" href="resources/thumbnail2.png" />
+
+<!-- Open Graph properties for Facebook -->
+<meta property="og:url" content="http://hillmapper.com" />
+<meta property="og:title" content="Hill Mapper San Francisco" />
+<meta property="og:description" content="Colors show which streets go uphill or downhill from your location, and their steepness." />
+<meta property="og:image" content="http://hillmapper.com/resources/thumbnail.png" />
+
+<style type="text/css">
+  html {
+  	width: 100%;
+	height: 100%;
+  }
+  body {
+  	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	font-family: Helvetica, sans-serif;
+	font-size: 13px;
+  }
+  div#header { 
+  	height: 34px;
+  	background-color: #fafbfc;
+	border-bottom: 1px solid #999;
+	display: none;
+  }
+  div#header_left {
+  	float: left;
+	padding: 9px 0px 0px 100px;
+	font-size: 16px;
+	font-weight: bold;
+  }
+  div#header_twitter {
+  	float: right;
+	padding: 7px 8px 5px 0px;
+  }
+  div#header_facebook {
+  	float: right;
+	padding: 7px 30px 5px 0px;
+  }
+  div#map_canvas { 
+  	position: absolute;
+  	top: 35px;
+  	right: 0px;
+  	bottom: 0px;
+  	left: 0px;
+  }
+  div#control_box_mobile {
+	border: 1px solid #999;
+	width: 115px;
+	top: 5px;
+	margin-left: 5px;
+	position: absolute;
+	background-color: #FFF;
+	opacity: 0.9;
+	padding: 8px 0px 4px 10px;
+	display: none;
+  }
+  div#control_box {
+	border: 1px solid #999;
+	width: 240px;
+	top: 55px;
+	margin-left: 90px;
+	position: absolute;
+	background-color: #FFF;
+	opacity: 0.9;
+	padding: 8px 10px 8px 15px;
+	display: none;
+  }
+  div#image-bg {
+	position: fixed;
+	width: 360;
+	height: 640px;
+	bottom: 0px;
+	right: 0px;
+	display: none;
+  }
+  div#instructions_mobile { 
+  	position: absolute;
+  	font-size: 16px;
+  	width: 240px;
+  	top: 0px;
+  	left: 0px;
+  	padding: 5px;
+  	background-color: #FFF;
+	border: 1px solid #000;
+  	opacity: 0.9;
+  	padding: 15px 0px 15px 20px;
+  	display: none;
+  }
+  div {
+	margin-bottom: 0px;	  
+  }
+  .title {
+	font-size: 14px;
+	font-weight: bolder;
+	margin-bottom: 8px;
+	text-align: center;
+  }
+  .descript {
+	font-weight: bold;
+  }
+  ol {
+ 	padding-left: inherit;
+	margin-bottom: 0px;
+  }
+  ol.mobile {
+ 	padding-left: 20px;
+  }
+  li {
+	margin-bottom: 6px;
+  }
+  a {
+	cursor: pointer;
+	color: #08519c;
+	text-decoration: none;
+  }
+  #show {
+	display: none;
+  }
+  hr {
+	margin-bottom: 5px;
+  }
+  #actions {
+  	text-align: left;
+	margin-bottom: 5px;
+  }
+  .action_mobile {
+  	text-align: left;
+	margin-bottom: 5px;
+  }
+  .star {
+    color: #08519c;
+	opacity: 0.8;
+  }
+  #search {
+	font-weight: bold;
+	margin-bottom: 5px;
+  }
+  #search_box {
+	margin-left: 0px;
+	display: table-cell; 
+	width: 96%;
+  }
+  #instructions {
+  	font-size: 12px;
+  	text-align: left;
+	margin-bottom: 5px;
+  }
+  #detect {
+  	text-align: left;
+	margin-bottom: 5px;
+  }
+  #footer {
+	font-size: 11px;
+	text-align: right;
+	margin-bottom: 0px;
+  }
+  div#alert {
+  	position: absolute;
+	border: 2px solid #000;
+	top: 0px;
+	left: 0px;
+	width: 320px;
+	background-color: #FFF;
+	padding: 10px 12px;
+	display: none;
+  }
+  div#alert-left {
+	float: left;
+	width: 270px; 
+	font-size: 14px;
+  }
+  div#alert-right {
+	float: right;
+	padding-top: 0px;
+  }
+</style>
+
+<script src="http://maps.googleapis.com/maps/api/js?sensor=true&libraries=geometry,places"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+<script src="resources/infobox_packed.js"></script>
+
+<script type="text/javascript">
+
+// XXX
+
+// Declare map and overlay elements
+var isMobile;
+var map;
+var locMarker;
+var infoWindow;
+var markerCircles = [];
+var gradeLines = [];
+var data = "";
+var lines = [];
+var elevationPoints = {};
+
+// Each object in gradeLines[] will have the following components:
+// - obj (Google Polyline)
+//		Actual object that's overlayed on the map, constructed from path in the JSON file
+// - grade (float)
+//		grade of the line, from the JSON file
+// - highLatLng (Google LatLng)
+// - lowLatLng (Google LatLng)
+//		LatLngs for the high and low endpoints of the grade line
+//		Pulling these from the array seems faster than using obj.getPath().getAt(x)
+// - uphill (bool)
+//		Records whether the grade line is currently rendered as uphill or downhill
+//		This speeds up the refreshing by letting us update grade line styles selectively
+// - onscreen (bool)
+//		Records whether the grade line is currently visible within the viewport
+//		This speeds up the refreshing by letting us update grade line styles selectively
+
+var initialMapZoom = 14;
+var initialMapType = 'map';
+var initialMapCenter = new google.maps.LatLng(37.7915, -122.4345);
+var initialMarkerPosition = new google.maps.LatLng(37.7815, -122.4345);
+var markerCircleRadiuses = [50, 130, 230, 350]; // radiuses in meters at zoom level 15, automatically scaled
+var markerCircleOpacities = [0.12, 0.06, 0.04, 0.025];
+
+var SF_BOUNDS = new google.maps.Polygon({
+	paths: [
+		new google.maps.LatLng(37.7034, -122.3514),
+		new google.maps.LatLng(37.8149, -122.3514),
+		new google.maps.LatLng(37.8149, -122.5192),
+		new google.maps.LatLng(37.7034, -122.5192),
+	],
+});
+
+
+function initialize() {
+
+	parseHashParams();
+	setUpDesktopUI();
+	
+	setUpMap();
+	
+	loadData();
+	loadJSON(data);
+	drawNewLines();
+	updateGradeLineVisibility();
+	activateGradeLines();
+}
+
+function setUpMobileUI() {
+	$('#control_box_mobile').show();
+	$('#instructions_mobile').center();
+	$('#map_canvas').css({top: '0px'});
+	tryGeolocation(true);
+}
+
+function setUpDesktopUI() {
+	$('#header').show();
+	$('#control_box').show();
+}
+
+function parseHashParams() {
+	// needs: initialMapZoom, initialMapType, initialMapCenter, initialMarketPosition	
+
+	if (window.location.hash == '')
+		return;	
+	var hash = window.location.hash.substr(1).split('/');
+	
+	// First check for existence of each parameter and put into correct data type
+	var z = hash[0] ? parseInt(hash[0]) : '';
+	var t = hash[1] ? hash[1] : '';
+	var m_lat = hash[2] ? parseFloat(hash[2]) : '';
+	var m_lng = hash[3] ? parseFloat(hash[3]) : '';
+	var c_lat = hash[4] ? parseInt(hash[4]) : '';
+	var c_lng = hash[5] ? parseInt(hash[5]) : '';
+
+	if (isNaN(z) || isNaN(m_lat) || isNaN(m_lng) || isNaN(c_lat) || isNaN(c_lng)) {
+		err();
+		return;
+	}
+	if (! (t == 'map' || t == 'terrain' || t == 'satellite')) {
+		err();
+		return;
+	}
+	
+	// // Satellite imagery not included in mobile interface, so use terrain instead
+	// if (isMobile && t == 'satellite')
+	// 	t = 'terrain';
+	
+	var m = new google.maps.LatLng(m_lat, m_lng);
+	var c = new google.maps.LatLng(m_lat-c_lat/10000, m_lng-c_lng/10000);
+	var cdb = google.maps.geometry.spherical.computeDistanceBetween;	
+	
+	// If either latlng is greater than 50 km from SF, probably an error
+	if ((cdb(m, initialMapCenter) > 50000) || (cdb(c, initialMapCenter) > 50000)) {
+		err();
+		return;
+	}
+		
+	initialMapZoom = z;
+	initialMapType = t;
+	initialMarkerPosition = m;
+	initialMapCenter = c;
+	
+	function err() {
+		window.location.hash = 'error_loading_link';
+	}
+}
+
+function setUpMap() {
+	// needs: map, initialMapZoom, initialMapType, initialMapCenter
+
+	var mapStyles = [ 
+		{featureType: 'landscape.man_made', elementType: 'geometry.fill', stylers: [{color: '#f8f1e3'}] },
+		{featureType: 'water', elementType: 'geometry.fill', stylers: [{ color: '#a5bfdd'}] },
+		{featureType: 'poi', stylers: [{visibility: 'off'}] },
+		{featureType: 'poi.park', elementType: 'geometry.fill', stylers: [{visibility: 'on'}, {color: '#d9e8bd'}] },
+		{featureType: 'transit', stylers: [{visibility: 'off'}] },
+		{featureType: 'transit.station.rail', stylers: [{visibility: 'on'}] },
+		{featureType: 'road', elementType: 'geometry.fill', stylers: [{color: '#ffffff'}] },
+		{featureType: 'road', elementType: 'geometry.stroke', stylers: [{lightness: 40}] },
+		{featureType: 'road', elementType: 'labels.icon', stylers: [{visibility: 'off'}] },
+		{featureType: 'road', elementType: 'labels.text.stroke', stylers: [{color: '#ffffff'}] },
+		{featureType: 'road.highway.controlled_access', 
+			elementType: 'geometry.fill', stylers: [{color: '#fbc042'}, {lightness: 70}] },
+	];
+
+	var customMapType = new google.maps.StyledMapType(mapStyles, {name: 'Map'});
+	
+	// this is just to translate the initialMapType shorthand into the real identifiers
+	var mapTypes = {
+		map: 'Map', 
+		terrain: google.maps.MapTypeId.TERRAIN, 
+		satellite: google.maps.MapTypeId.SATELLITE,
+	};
+	
+	var mapTypeIds = isMobile ? 
+		[mapTypes.map, mapTypes.terrain] :
+		[mapTypes.map, mapTypes.terrain, mapTypes.satellite];
+	
+    var mapOptions = {
+		zoom: initialMapZoom,
+		center: initialMapCenter,
+		scaleControl: true,
+		streetViewControl: false,
+		mapTypeId: mapTypes[initialMapType],
+		mapTypeControlOptions: {
+        	mapTypeIds: mapTypeIds,
+        }
+	};
+
+	map = new google.maps.Map(document.getElementById('map_canvas'), mapOptions);
+	map.mapTypes.set('Map', customMapType);
+	
+	google.maps.event.addListener(map, 'idle', function() {
+		// this picks up 'dragend', 'zoom_changed', AND the initial map load
+		// maybe can simplify this if there's an event for initial map load...
+		updateGradeLineVisibility();
+	});
+	google.maps.event.addListener(map, 'click', function() {
+		if (infoWindow)
+			infoWindow.close();
+	});
+	
+	// Draw boundary line at the south edge of SF
+	var boundary = new google.maps.Polyline({
+		map: map,
+		path: [
+			new google.maps.LatLng(37.7083, -122.3932),
+			new google.maps.LatLng(37.7083, -122.5023)
+		],
+		clickable: false,
+		strokeColor: 'black',
+		strokeOpacity: 0.3,
+		strokeWeight: 2,
+	});
+}
+
+function setUpSearchBox() {
+	// needs: map, locMarker	
+	var input = document.getElementById('search_box');
+	var autocomplete = new google.maps.places.Autocomplete(input, {
+		componentRestrictions: {country: 'us'},
+	});
+	autocomplete.setComponentRestrictions();
+	autocomplete.bindTo('bounds', map);
+	google.maps.event.addListener(autocomplete, 'place_changed', function() {
+		var place = autocomplete.getPlace();
+		if (! google.maps.geometry.poly.containsLocation(place.geometry.location, SF_BOUNDS)) {
+			customAlert("Hill Mapper's coverage area is currently limited to the city of San Francisco.");
+			return;
+		}
+		map.setCenter(place.geometry.location);
+		map.setZoom(16);
+		locMarker.setPosition(place.geometry.location);
+	});
+}
+
+function drawNewLines() {
+	
+	loadLines();
+	var elevationLocations = [];
+	for (var i=0; i<lines.length; i++) {
+		var path = [];
+		
+		// find the points we need elevations for
+		for (var j=0; j<lines[i].length; j++) {
+
+			var currLocation = new google.maps.LatLng(lines[i][j][1], lines[i][j][0]);
+			path[j] = currLocation;
+
+			var opacity = 1;
+			var g = google.maps.geometry.spherical;			
+
+			if (
+				j != 0 && 
+				j != lines[i].length - 1 &&
+				g.computeDistanceBetween(currLocation, path[j-1]) < 50
+			) {
+				opacity = .3;
+			} else {
+				elevationLocations.push(currLocation);
+			}
+			
+				// 		    var marker = new google.maps.Marker({
+				// 		        position: currLocation,
+				// 		        map: map,
+				// opacity: opacity,
+				// 		    });
+			
+			// var distance = g.computeDistanceBetween(markerLatLng, gradeLines[i].highLatLng);
+			
+			
+		}
+		polyline = new google.maps.Polyline({
+			path: path,
+			strokeColor: 'rgba(0, 255, 255, 1)',
+			strokeOpacity: 1.0,
+			strokeWeight: 2,
+		});
+		// polyline.setMap(map);
+	}
+	
+	// get the elevations
+	elevator = new google.maps.ElevationService();
+
+	var positionalRequest = { 'locations': elevationLocations }
+	
+	elevator.getElevationForLocations(positionalRequest, function(results, status) {
+		if (status != google.maps.ElevationStatus.OK) {
+			// something went wrong with the elevation request
+			$('#elev_info').html(status);
+		} else {
+			for (var i=0; i<results.length-1; i++) {
+				// console.log(results[i]);
+				var lat = Math.round(results[i].location['A'] * 100000);
+				var lng = Math.round(results[i].location['F'] * 100000);
+				var key = "" + lat + lng;
+				// console.log("creating array with key" + key);
+				elevationPoints[key] = results[i].elevation;
+			}
+			drawElevations();
+		}
+		// console.log(elevationPoints);
+		// console.log("first point: " + elevationPoints[0].location + "elev:" + elevationPoints[0].elevation);
+	});
+}
+
+function drawElevations() {
+	// draw the elevations on map
+	for (var i=0; i<lines.length; i++) {
+		
+		var segmentPath = [];
+
+		var prevLocation = new google.maps.LatLng(lines[i][0][1], lines[i][0][0]);
+		
+		segmentPath.push(prevLocation);
+		// console.log("start new edge: " + segmentPath);
+
+		var lat = Math.round(prevLocation.lat() * 100000);
+		var lng = Math.round(prevLocation.lng() * 100000);
+		var key = "" + lat + lng;
+		var segmentStartElev = elevationPoints[key];
+
+			// 	    var marker = new google.maps.Marker({
+			// 	        position: prevLocation,
+			// opacity: 0.7,
+			// 	        map: map,
+			// title: "start",
+			// 	    });
+
+		var segmentPathDistance = 0;
+
+		var segmentEndElev;
+		var currLocation;
+
+		var geometry = google.maps.geometry.spherical;			
+		
+		// traverse the edge
+		for (var j=1; j<lines[i].length; j++) {
+			var currLocation = new google.maps.LatLng(lines[i][j][1], lines[i][j][0]);
+			
+			segmentPath.push(currLocation);
+			// console.log("added loc: " + segmentPath);
+			
+			var currDistance = geometry.computeDistanceBetween(currLocation, prevLocation);
+			segmentPathDistance += currDistance;
+			
+			var distOutput = "";
+			
+			if (currDistance > 50 || j == lines[i].length - 1) {
+				
+				// console.log("end seg: " + segmentPath);
+				distOutput += "end seg: ";
+				
+				var lat = Math.round(currLocation.lat() * 100000);
+				var lng = Math.round(currLocation.lng() * 100000);
+				var key = "" + lat + lng;
+				segmentEndElev = elevationPoints[key];
+
+				var segmentGain = Math.abs(segmentEndElev - segmentStartElev);
+				
+				var segmentGrade = (segmentGain / segmentPathDistance);
+				console.log("gain: " + segmentGain + "dist: " + segmentPathDistance);
+				
+					// 			    var marker = new google.maps.Marker({
+					// 			        position: currLocation,
+					// 			        map: map,
+					// title: "gain: " + segmentGain + "\ndist: " + segmentPathDistance,
+					// 			    });
+
+				var palatte = [		
+					// 'rgba(0, 255, 0, 0)',
+					'rgba(0, 255, 0, 1)',
+					'rgba(255, 255, 0, 1)',
+					'rgba(255, 0, 0, 1)',
+					'rgba(0, 0, 255, 1)',
+					'rgba(255, 255, 255, 1)',
+				]
+		
+				var perct = Math.min(segmentGrade, .15) / .15;
+				var selector = Math.floor(perct * (palatte.length))
+				var color = palatte[selector];
+
+				polyline = new google.maps.Polyline({
+					path: segmentPath,
+					strokeColor: color,
+					strokeOpacity: 1.0,
+					strokeWeight: 3,
+				});
+				polyline.setMap(map);
+
+				segmentStartElev = segmentEndElev;
+				segmentPath = [];
+				segmentPath.push(currLocation);
+				// console.log("reset path: " + segmentPath)
+				segmentPathDistance = 0;
+				
+			} else {								
+					// 			    var marker = new google.maps.Marker({
+					// 			        position: currLocation,
+					// opacity: 0.3,
+					// 			        map: map,
+					// title: "dist: " + currDistance,
+					// 			    });
+			}
+			
+			// if (j<lines[i].length)
+			// 	console.log(segmentPath);
+			
+			// console.log(distOutput + segmentPathDistance);
+			
+			var prevLocation = currLocation;
+			
+			// test code that just shows markers, doesn't show elevation colors
+			// if (
+			// 	j != 0 &&
+			// 	j != lines[i].length - 1 &&
+			// 	g.computeDistanceBetween(currLocation, path[j-1]) < 50
+			// ) {
+			// 	opacity = .3;
+			// 	title = "fade";
+			// } else {
+			// 	var lat = Math.round(lines[i][j][1] * 100000);
+			// 	var lng = Math.round(lines[i][j][0] * 100000);
+			// 	var key = "" + lat + lng;
+			// 	console.log("key when looking up" + key);
+			// 	title = "" + elevationPoints[key];
+			// }
+			//
+			// 		    var marker = new google.maps.Marker({
+			// 		        position: currLocation,
+			// 		        map: map,
+			// 	opacity: opacity,
+			// 	title: title,
+			// 		    });
+
+
+			// var distance = g.computeDistanceBetween(markerLatLng, gradeLines[i].highLatLng);
+			
+			
+		}
+	}
+
+	
+	// XXX
+}
+
+function loadJSON(json) {
+	// needs: gradeLines
+
+// XXX - turn old lines on/off
+	
+	var t = new Date().getTime();
+	var minGrade = 100;
+	var maxGrade = 1;
+	for (var i=0, l=json.features.length; i<l-1; i++) {
+		var f = {};
+		var path = google.maps.geometry.encoding.decodePath(json.features[i][0]);
+		f.obj = new google.maps.Polyline({path: path});
+		f.grade = json.features[i][1];
+		
+		var palatte = [		
+			// 'rgba(0, 255, 0, 0)',
+			'rgba(0, 255, 0, 1)',
+			'rgba(255, 255, 0, 1)',
+			'rgba(255, 0, 0, 1)',
+			// 'rgba(0, 0, 255, 1)',
+			'rgba(255, 255, 255, 1)',
+		]
+		
+		// min(.2, .3) / .3
+		// floor [% * (count-1)]
+		
+		// f.grade is out of 100, not 1
+		
+		minGrade = Math.min(minGrade, f.grade);
+		maxGrade = Math.max(maxGrade, f.grade);
+		
+		var perct = Math.min((f.grade-5), 15) / 15;
+		var selector = Math.floor(perct * (palatte.length))
+		var color = palatte[selector];
+		
+		f.obj.setOptions({
+			strokeOpacity: 0.0,
+			strokeWeight: 5,
+			strokeColor: color,
+		});
+		var d = json.features[i][2];
+		f.lowLatLng = path[d * (path.length-1)];
+		f.highLatLng = path[(1-d) * (path.length-1)];
+		f.onscreen = true; // default in case data loads more quickly than the map viewport
+		gradeLines.push(f);
+	}
+	// console.log('min: ' + minGrade + 'max: ' + maxGrade);
+	// console.log('count: ' + json.features.length);
+	// console.log('loadJSON: ' + (new Date().getTime() - t) + ' ms');
+}
+
+function updateGradeLineVisibility() {
+	// needs: gradeLines[]
+		
+	// This runs at initialization and whenever the viewport bounds are changed
+
+	if (! map.getBounds())
+		return;
+	
+	var t = new Date().getTime();
+	var b = map.getBounds();	
+	for (var i=0, l=gradeLines.length; i<l; i++) {
+		var s = gradeLines[i];
+		s.onscreen = true;
+		// s.onscreen = (b.contains(s.highLatLng) || b.contains(s.lowLatLng));
+	}
+	// console.log('updateVisibility: ' + (new Date().getTime() - t) + ' ms');
+}
+
+function activateGradeLines(override) {
+	// needs: map, gradeLines
+	
+	// This runs at initialization only. The majority of the initialization time goes to 
+	// linking the gradeLines to the map. So if the viewport bounds have loaded already, we 
+	// can speed things up by only linking the visible lines, and linking the others later.
+
+	var t = new Date().getTime();
+	var count = 0;
+
+	for (var i=0, l=gradeLines.length; i<l; i++) {
+		if ((! override) && (! gradeLines[i].onscreen))
+			continue;
+		count ++;
+		gradeLines[i].obj.setMap(map);
+	}
+	var s = override ? ' (full map)' : '';
+	// console.log('activateGradeLines: ' + (new Date().getTime() - t) + ' ms, ' + count + ' lines' + s);
+}
+
+function addGradeLineListeners() {
+	var t = new Date().getTime();
+	for (var i=0, l=gradeLines.length; i<l; i++) {
+		// Because listeners are added inside a loop, we have to create the callbacks
+		// using an outside function so that each has the correct closures.
+		google.maps.event.addListener(gradeLines[i].obj, 'click', makeGradeLineCallback(gradeLines[i].grade));
+	}
+	// console.log('addGradeLineListeners: ' + (new Date().getTime() - t) + ' ms');
+}
+
+function makeGradeLineCallback(grade) {
+	return function(e) {
+		makeGradeLabel(grade, e.latLng);
+	};
+}
+
+function makeGradeLabel(grade, latLng) {
+	// needs: map, infoWindow
+	if (infoWindow)
+		infoWindow.close();
+	var msg = '' + grade.toFixed(1) + '%&nbsp;grade';
+	var style = {
+		background: '#FFF', 
+		width: '76px', 
+		opacity: '0.8',
+		padding: '2px',
+		border: '1px solid #CCC',
+		'font-family': 'Helvetica, sans-serif',
+		'font-size': '12px',
+		'text-align': 'center',
+	};
+	infoWindow = new InfoBox({
+		content: msg, 
+		position: latLng, 
+		boxStyle: style, 
+		closeBoxURL: '',
+		enableEventPropagation: true,
+		alignBottom: true,
+		pixelOffset: new google.maps.Size(-38, 0),
+	});
+	infoWindow.open(map);
+}
+
+function retrieveLocMarker() {
+	// needs: map, locMarker
+	locMarker.setPosition(map.getCenter());
+}
+
+function customAlert(s) {
+	if (isMobile)
+		alert(s)
+	else {
+		$('#alert-left').html(s);
+		// calculate offset to center 'OK' button: 
+		//    box height minus padding, minus button height, divided by 2, minus an adjustment
+		var offset = ($('#alert').innerHeight() - 20 - $('#alert-ok').innerHeight()) / 2 - 2;
+		$('#alert-right').css('padding-top', offset);
+		$('#alert').center();
+		$('#alert').show();
+		$('#alert-ok').focus();
+	}
+}
+
+function tryGeolocation(initial) {
+	// needs: map, locMarker
+	//   and if initial=true: initialMapCenter, initialMarkerPosition, initialMapZoom
+	if(navigator.geolocation)
+    	navigator.geolocation.getCurrentPosition(geoSetMap, fail);
+    else
+    	fail();
+    	
+    function geoSetMap(pos) {
+	    var latlng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+		if (! google.maps.geometry.poly.containsLocation(latlng, SF_BOUNDS)) {
+			var s = isMobile ? 
+				"It looks like you're outside of Hill Mapper's coverage area — currently limited to the city of San Francisco — but you can still explore the map." :
+				"It looks like you're outside of Hill Mapper's coverage area, which is currently limited to the city of San Francisco.";
+		    customAlert(s)
+			return;
+		}
+		setLocation(latlng);
+    }
+    
+    function fail(e) {
+    	var s = isMobile ?
+    		"Unable to detect your location. You can still explore the map, or reload the page to try again." :
+    		"Unable to detect your location.";
+	    customAlert(s);
+    }
+}
+
+function setLocation(latlng) {
+	if (map) {
+	    map.setCenter(latlng);
+	    map.setZoom(16);
+	    locMarker.setPosition(latlng);
+	}
+	else {
+		initialMapCenter = latlng;
+		initialMapZoom = 16;
+		initialMarkerPosition = latlng;
+	}
+}
+
+
+// jQuery code for the HTML elements:
+
+// from http://archive.plugins.jquery.com/project/autocenter
+(function($){
+    $.fn.extend({
+        center: function () {
+            return this.each(function() {
+                var top = ($(window).height() - $(this).outerHeight()) / 2;
+                var left = ($(window).width() - $(this).outerWidth()) / 2;
+                $(this).css({position:'absolute', margin:0, top: (top > 0 ? top : 0)+'px', left: (left > 0 ? left : 0)+'px'});
+            });
+        }
+    }); 
+})(jQuery);
+
+
+$(document).ready(function(){
+
+	$("#hide").click(function() {
+		$(".descript").hide();
+		$(".instructions").hide();
+		$(this).hide();
+		$("#show").show();
+	});
+
+	$("#show").click(function() {
+		$(".descript").show();
+		$(".instructions").show();
+		$(this).hide();
+		$("#hide").show();
+	});
+	
+	$('#link_generator').mouseover(function() {
+		$(this).attr('href', generateLink());
+	});
+	
+	$('a.marker_retriever').click(function() {
+		retrieveLocMarker();
+	});
+	
+	$('a.location_detector').click(function() {
+		tryGeolocation();
+	});
+	
+	$('a.instruction_viewer').click(function() {
+		$('#instructions_mobile').show();
+	});
+	
+	$('div#instructions_mobile').click(function() {
+		$('#instructions_mobile').hide();
+	});
+	
+	$('#alert-ok').click(function() {
+		$('#alert').hide();
+	});
+	
+	$('#alert-ok').keydown(function(e) {
+		if(e.keyCode == 13) // this is the 'enter' key
+			$('#alert').hide();
+	});
+	
+});
+
+function loadLines() {
+	lines = 
+	[
+[[-122.4159885,37.7857756],[-122.416232,37.7857435],[-122.4163329,37.7857302]],
+[[-122.4156751,37.7854571],[-122.4157652,37.7859055],[-122.4157681,37.7859219]],
+[[-122.4210201,37.7843027],[-122.4194752,37.7844985],[-122.4178121,37.7847092]],
+[[-122.4128748,37.7853291],[-122.4129929,37.7853145],[-122.4139367,37.7851984]],
+[[-122.4150247,37.78554],[-122.4150496,37.7856488],[-122.4150791,37.7857823]],
+[[-122.4186044,37.780272],[-122.4186288,37.780392],[-122.4187065,37.7807734],[-122.4188009,37.7812369],[-122.4188963,37.7817056],[-122.4189907,37.7821692],[-122.4191803,37.7831004]],
+[[-122.4176225,37.7837776],[-122.4192752,37.7835666]],
+[[-122.416889,37.781954],[-122.416983,37.78242]],
+[[-122.4132462,37.78358],[-122.4132991,37.7838481]],
+[[-122.4136759,37.7809326],[-122.413866,37.781863],[-122.414054,37.782794],[-122.4142422,37.783725]],
+[[-122.4154947,37.78594],[-122.4157652,37.7859055]],
+[[-122.4212114,37.7852419],[-122.4196618,37.7854277]],
+[[-122.4087107,37.7835088],[-122.4087495,37.7834883],[-122.4088024,37.78347],[-122.4088498,37.7834582],[-122.4091447,37.78342],[-122.410765,37.783214],[-122.412412,37.783004],[-122.413003,37.782928],[-122.414054,37.782794],[-122.415694,37.782585],[-122.416983,37.78242],[-122.4173378,37.7823794]],
+[[-122.4146195,37.7813029],[-122.4146949,37.7817573]],
+[[-122.4146872,37.7841791],[-122.414778,37.784613]],
+[[-122.4188963,37.7817056],[-122.4204516,37.7815101]],
+[[-122.4201607,37.7800812],[-122.4201815,37.7801837],[-122.4202612,37.7805752],[-122.4203391,37.7809578],[-122.4203551,37.7810363],[-122.4203719,37.7811189],[-122.4204516,37.7815101],[-122.4205284,37.7818875],[-122.4205455,37.7819715],[-122.4205611,37.7820478],[-122.4207351,37.7829026]],
+[[-122.4169614,37.7804935],[-122.4169829,37.7806044],[-122.4171479,37.7814468]],
+[[-122.4175274,37.7833106],[-122.4158826,37.783514]],
+[[-122.4208303,37.7833702],[-122.4192752,37.7835666]],
+[[-122.4159167,37.7854263],[-122.4159343,37.7855191],[-122.4159885,37.7857756]],
+[[-122.4082344,37.7873727],[-122.4082638,37.7873688],[-122.4098859,37.7871475],[-122.411516,37.78694],[-122.4123458,37.7868458],[-122.4131602,37.7867431],[-122.414807,37.78652],[-122.416449,37.78631],[-122.4180963,37.786105]],
+[[-122.4216555,37.786614],[-122.4216205,37.7864421],[-122.4214645,37.7856761],[-122.4213702,37.7852127],[-122.4212753,37.7847467],[-122.4211807,37.7842818],[-122.421085,37.7838121],[-122.420991,37.7833502],[-122.4208957,37.7828822],[-122.4208012,37.7824181],[-122.4207209,37.7820238],[-122.4207061,37.7819511],[-122.4206882,37.7818632],[-122.4205327,37.7810993],[-122.4205163,37.7810187],[-122.4204988,37.7809328],[-122.4203427,37.7801658],[-122.4203241,37.7800744]],
+[[-122.4207351,37.7829026],[-122.4208303,37.7833702],[-122.4209244,37.7838327],[-122.4210201,37.7843027],[-122.4211141,37.7847643],[-122.4212114,37.7852419],[-122.4213032,37.785693]],
+[[-122.4208957,37.7828822],[-122.4207351,37.7829026]],
+[[-122.4207351,37.7829026],[-122.4191803,37.7831004]],
+[[-122.4180963,37.786105],[-122.4181281,37.7861951],[-122.418206,37.7865767],[-122.4182969,37.7870355]],
+[[-122.4180963,37.786105],[-122.4197509,37.7858973]],
+[[-122.4211141,37.7847643],[-122.4195687,37.7849636],[-122.4179073,37.7851767],[-122.416261,37.7853825],[-122.4159167,37.7854263],[-122.4156751,37.7854571],[-122.4150247,37.78554],[-122.4146191,37.7855916],[-122.4129795,37.7858005]],
+[[-122.4214007,37.7861835],[-122.4198505,37.7863746],[-122.418206,37.7865767]],
+[[-122.4205163,37.7810187],[-122.4203551,37.7810363],[-122.4202624,37.7810483],[-122.4188009,37.7812369],[-122.4171479,37.7814468]],
+[[-122.4207061,37.7819511],[-122.4208325,37.781935],[-122.4221685,37.7817651],[-122.4222866,37.7817501],[-122.4223923,37.7817366],[-122.4239193,37.7815424]],
+[[-122.4191803,37.7831004],[-122.4175274,37.7833106]],
+[[-122.4158826,37.783514],[-122.4142422,37.783725]],
+[[-122.4197509,37.7858973],[-122.4213032,37.785693]],
+[[-122.4158826,37.783514],[-122.415694,37.782585],[-122.415505,37.781654],[-122.4153225,37.7807118]],
+[[-122.4197509,37.7858973],[-122.4198505,37.7863746],[-122.4199353,37.7868235]],
+[[-122.4191803,37.7831004],[-122.4192752,37.7835666],[-122.4193702,37.7840334]],
+[[-122.4173378,37.7823794],[-122.4175274,37.7833106]],
+[[-122.4175274,37.7833106],[-122.4176225,37.7837776],[-122.4177156,37.7842349],[-122.4178121,37.7847092],[-122.4179073,37.7851767],[-122.4179983,37.7856236],[-122.4180963,37.786105]],
+[[-122.4173378,37.7823794],[-122.4189907,37.7821692],[-122.4204505,37.7819836],[-122.4205455,37.7819715],[-122.4207061,37.7819511]],
+[[-122.41443,37.784657],[-122.414778,37.784613],[-122.416072,37.784449],[-122.4177156,37.7842349],[-122.4193702,37.7840334]],
+[[-122.417017,37.78911],[-122.416827,37.788178],[-122.4167634,37.7878678],[-122.4166393,37.7872465],[-122.416449,37.78631],[-122.4163329,37.7857302],[-122.416261,37.7853825],[-122.416072,37.784449],[-122.4158826,37.783514]],
+[[-122.41443,37.784657],[-122.414521,37.785105],[-122.4146191,37.7855916],[-122.414807,37.78652],[-122.4149952,37.7874552],[-122.415185,37.788388],[-122.4153789,37.7893409],[-122.4155691,37.7902533],[-122.415683,37.7908113],[-122.4157468,37.7911144],[-122.4157641,37.791208]],
+[[-122.4171479,37.7814468],[-122.416799,37.781491],[-122.416341,37.781549],[-122.415505,37.781654],[-122.4146949,37.7817573],[-122.413866,37.781863],[-122.412221,37.782073]],
+[[-122.4171479,37.7814468],[-122.4173378,37.7823794]],
+[[-122.4193702,37.7840334],[-122.4194752,37.7844985],[-122.4195687,37.7849636],[-122.4196618,37.7854277]],
+[[-122.4193702,37.7840334],[-122.4209244,37.7838327],[-122.421085,37.7838121],[-122.422653,37.783619],[-122.424295,37.7834]],
+[[-122.4142422,37.783725],[-122.4132991,37.7838481],[-122.4125958,37.7839368],[-122.4109535,37.7841481],[-122.409331,37.7843568]],
+[[-122.4142422,37.783725],[-122.41443,37.784657]],
+[[-122.412782,37.784866],[-122.41443,37.784657]],
+[[-122.4196618,37.7854277],[-122.4179983,37.7856236]],
+[[-122.4196618,37.7854277],[-122.4197509,37.7858973]],
+	]
+	;
+}
+
+function loadData() {
+	data = {"features":[["kqveFlocjVzCa@",6.7,0],["e~veFngcjVtC_@",6.5,0],["kxveFhfcjVtC]",12.3,0],["qrveFbecjVtC[",10.4,0],["_rveFxncjVc@yG",12.0,0],["clveFrmcjVQsCUmC",14.1,0],["cyveFtecjVOaC",5.7,0],["{~veFbbcjVvC]",10.4,0],["wyveFt`cjVQaC",5.3,0],["gvveF|dcjVc@yG",8.3,0],["uyveFl|bjVxCa@",20.9,0],["{xveFzbcjV~@O",16.3,0],["isveFldcjVc@wG",11.6,0],["otveFrzbjVIgB",14.7,0],["_uveFpubjVBcC",10.4,1],["}sveFd{bjV|C[",11.7,0],["qmveFhccjVc@}G",12.6,0],["wnveFnybjVIwAYcE",7.8,0],["{hveFhxbjVW}E",14.4,0],["uiveFpubjVo@HOyB",14.4,0],["qgveFjbcjVe@cH",13.2,0],["ghveFzxbjVd@GvBW",14.8,1],["iqveFhsbjVIeADEd@K",11.4,0],["stveFhqbjVv@I",18.7,0],["}oveFzobjV?SPUJANJTb@\\X\\Fl@Kd@WN]`@Sl@SNKTYNY@YAWI]UKSCUBcAp@",7.6,0],["}fveF|bcjVvCa@",5.3,1],["yaveFz`cjVOaC",7.3,0],["mbveFb|bjVO_C",6.4,0],["_cveFdwbjVSgC",23.2,0],["wcveFdrbjVOsB",23.8,0],["_|ueFv_cjVQeC",7.6,0],["s|ueF|zbjVOcC",7.4,0],["e}ueFhvbjVOmC",10.0,0],["c~ueFtqbjVyC^",11.8,0],["y}ueFdqbjVOaC",10.8,0],["q~ueFxnbjVuC\\",17.8,0],["ccveFbzbjVeAN",9.6,0],["seveF`zbjVmAP",14.3,0],["qcveFxmbjVtC[",21.7,1],["m~ueFdlbjVOaC",17.2,0],["iwueF~tbjVMgC",10.4,0],["ywueFbpbjVQcC",16.4,0],["oxueF|jbjVScC",21.4,0],["oqueFtsbjVQiC",13.0,0],["erueF|qbjVoBT",6.7,0],["orueFjobjVeAL",13.9,0],["crueF|nbjVQcC",14.4,0],["yrueFvibjVMmB",20.2,0],["itueFv`bjVwC\\",19.4,0],["cyueFhfbjVQcC",13.1,1],["_|ueFbbbjV_AH",13.6,0],["}~ueFlgbjVQgC",16.3,0],["s_veFzabjVKoB",17.0,1],["atueF|_bjVa@cH",20.2,1],["}nueFd}ajVcAJ",11.0,0],["qnueFp_bjVuC\\",15.9,0],["ytueFt}ajVcAL",20.1,0],["imueFpibjVq@D_BN",29.2,0],["}nueFbibjVImA",20.1,0],["kpueFrnbjVMcC",13.5,0],["_nueFp~ajVe@}G",8.2,1],["c{ueFrvajVKyA",6.1,1],["iuueFluajV[}D",6.4,1],["koueFftajVW}D",8.1,1],["e`veFnbbjVqBP",18.0,1],["gbveFffbjVIgA",11.2,1],["sbveFpbbjVS_D",10.9,1],["ogveF|cbjVmAR",9.8,1],["yvveFbhbjVNxB",5.2,0],["wzveFp|bjVk@H",14.9,1],["gfveFllcjVc@yG",13.7,0],["ueveFbmcjVvC]",6.3,0],["o`veF`kcjVc@yG",5.7,0],["{yueFxjcjVtC]",5.8,0],["_tueFricjVpC]",5.8,0],["kjueFf|bjVc@{G",5.7,1],["ipueFrwbjVlAqB",5.0,1],["snueFvsbjVgAJ",9.1,0],["aiueFnfcjVe@}G",5.9,1],["wqveFbzbjVI{A",21.8,0],["aqveFrxbjVv@K",10.6,0],["c_veFvvbjVG{A",15.1,0],["csueFpjbjViAL",11.4,0],["woueFhsbjVOeC",7.7,0],["ulueFfnbjVyCZ",17.7,0],["czueFxabjVWB",16.6,0],["{iveF`ebjVfBW",15.6,0],["eeveF`dbjVdD]",9.2,0],["}dveFd_cjVQgC",7.2,0],["obveFb_cjVcAJ",9.8,0],["_tveFzndjVE{@",15.2,1],["cnveFrmdjVc@kG",13.7,1],["ihveFjldjVc@yG",12.3,1],["oiveFt}cjVtC_@",10.6,0],["cjveFlxcjV~@K",7.0,0],["yhveFxbdjVtC_@",11.5,0],["isveFhodjVtCY",14.0,0],["mgveF`mdjVpC]",6.9,0],["obveFdkdjVa@{G",9.1,1],["siveF~{cjVjAoB",6.2,0],["uaveF|kdjVtC_@",12.3,0],["ubveFhddjV|@OFF\\pE",10.3,0],["_cveFradjVrC]",14.4,0],["idveFlwcjVvCY",11.5,0],["}}ueFr_djVc@sG",5.3,1],["i_veFhucjVU_E",5.7,1],["{_veFdtcjVeCZ",11.0,1],["keveFnocjVnBU",6.5,0],["q~ueFlvcjVxC_@",10.7,0],["kyueFltcjVe@_H",8.0,1],["m}ueFn`djVzC]",20.1,0],["s|ueF|idjVe@yG",8.1,1],["w{ueFxjdjVlC]",28.2,0],["wvueFvhdjVe@yG",13.1,1],["axueFl~cjVe@wG",11.9,1],["sxueFducjVtC_@",17.0,0],["ssueF|rcjVa@uG",15.7,1],["myueFtocjVrAUdAK",11.1,0],["kwueFf_djVtC[",22.5,0],["irueFj}cjVa@{G",15.8,1],["}uueFridjVnC]",25.9,0],["ckueFvfdjVUqD",18.3,0],["oqueF`~cjVrCa@",21.9,0],["ykueFx|cjVtC]",21.1,1],["cmueF`wcjVMuB",17.1,1],["wmueF|qcjVc@}G",11.7,1],["amueFvrcjVbAM",7.5,1],["ufueF`{cjVSyBO{B",21.1,1],["weueF`adjVW{C",28.7,1],["gbueFtddjVa@_H",14.2,1],["keueFrvcjVvBW",6.9,0],["afueFjqcjVzBY",10.4,0],["ofueF|kcjVpBQ",6.3,0],["abueFrocjVa@yG",12.0,1],["yaueFbqcjVRlDPvB",11.6,0],["idueF|edjVdAOnAI",13.9,1],["m_ueFbddjVa@{G",9.9,1],["y~teFzddjVtC_@",13.0,0],["eyteFtcdjVpC]",13.2,0],["}yteF~bdjVe@yG",13.4,1],["ktteFzadjVe@}G",18.6,1],["}nteFv`djVa@yG",15.8,1],["e`ueFpzcjVtC_@",8.1,0],["{`ueFjucjVtC_@",5.4,0],["ybueFbfcjVxC_@",6.4,0],["c_ueFdocjVg@aH",10.6,1],["q|teFrncjVa@cH",9.2,1],["g{teFzxcjVc@_H",15.4,1],["szteFlycjVrC]",5.2,0],["_uteFhxcjVrC_@",5.0,0],["uuteFtwcjVe@_H",16.4,1],["_wteFlmcjVe@wG",7.0,1],["g}teF|dcjVvCY",6.6,0],["awteF~hcjVtCc@",14.5,0],["mvteFfncjVvC_@",13.0,0],["epteFpvcjVc@_H",11.3,1],["arteFjgcjVQcC",13.2,1],["uwteF|ccjVrC_@",9.7,0],["clteFf`djVc@{G",14.9,1],["iiteFp_djVc@{G",13.5,1],["}pteF~lcjVrC_@",20.1,0],["alteFbkcjVc@wG",16.9,1],["uqteFvgcjV|@K",18.5,0],["krteFtbcjVvCa@",8.8,0],["}lteFnacjVzC_@",7.7,0],["igteFdacjV^tG",11.3,0],["whteFb`djVtC]",13.5,1],["scteFh~cjVc@qG",5.3,1],["ybteF`_djVvC_@",23.8,1],["_dteFxtcjVrC[",22.8,1],["meteFrjcjVpCa@",21.3,1],["i`teFphcjVe@kG",7.8,1],["sfteFd`cjVnCM",16.5,1],["{|seF|}cjVrC]",14.5,1],["_wseFt|cjVnC[",12.6,1],["ssseFnqcjVuC`@",12.7,0],["myseFxrcjVyCZ",14.7,0],["yzseFrhcjVyCV",19.9,0],["}`teFp_cjVzCa@",16.1,1],["uyseFlhcjVtCW",14.4,1],["utseFhfcjVc@oG",5.6,1],["a{seFh~bjVvC[",15.1,1],["urseFfqcjVzC_@",10.3,1],["mmseFjocjVe@sG",5.6,1],["}sseFngcjV~Co@",10.8,1],["euseFd}bjVvCg@",6.1,1],["kqseFp{cjVxC_@",9.6,1],["wmseF`zcjVc@sG",5.3,1],["clseFzycjVQeC",5.7,1],["clseFhucjVtC_@",9.9,1],["qkseFjzcjVvC]",11.3,1],["ylseFbpcjVtC[",8.5,1],["qoseFt{bjVvC[",5.4,1],["exseFvibjV^bG",6.9,0],["ovseFtrbjVxCc@",5.4,1],["gtseFhqbjV]kG",5.6,1],["w{seFf}bjVa@{G",5.8,1],["}|seFjsbjVe@{G",10.6,1],["w~seFdjbjVqCX",10.1,0],["cjteFpkbjVa@}F",12.6,1],["adteFnjbjVa@kG",13.3,1],["g~seFjibjVc@eG",6.2,1],["ieteFp`bjVi@uG",6.2,1],["mkteFzabjV_@sG",6.4,1],["svteFddbjVa@qG",5.1,1],["ayteFtdbjVe@wG",5.1,1],["a|teFfebjV_@iG",5.0,1],["wsteFrcbjVc@wG",5.1,1],["qjteFjlbjVsC^",6.4,1],["{oteFzlbjVa@aG",9.6,1],["qrteFfmbjV]{F",10.4,1],["iuteFbnbjV_@oG",10.6,1],["{zteF`objV_@eG",8.6,1],["qgteFp_cjV_@wG",15.7,1],["whteFjubjVe@sG",17.9,1],["icteFbubjVy@J",9.3,0],["qateFn~bjVa@yG",5.2,1],["}|seFlxbjVsCX",16.9,0],["m}seF`tbjVwCX",17.3,0],["ybteFbtbjVc@mG",15.7,1],["eiteFjvbjVm@H",11.2,1],["qnteFvvbjVe@wG",14.1,1],["shteFf{bjVwC\\",9.8,1],["yeteFxzbjVq@F",20.8,1],["kmteFx`cjVa@{G",18.2,1],["ixteFbccjVc@wG",11.8,1],["wrteF|acjVc@uG",14.5,1],["knteFh|bjVmC\\",6.0,1],["otteFxxbjVoC\\",5.6,1],["iyteFp`cjVoCZ",5.1,1],["y}teFbdcjVa@sG",9.4,1],["__ueFdzbjVe@{G",10.0,1],["qyteF`ybjVc@wG",9.0,1],["atteFxwbjVc@yG",10.7,1],["i`ueFfpbjVa@iG",7.3,1],["w~teF~_cjVqC^",5.0,1],["icueFjecjVa@kG",7.6,1],["qdueF~zbjVc@sG",8.2,1],["}jueF~objVlBaD",7.0,1],["alueFjibjVlCW",9.9,1],["wgueFb~ajVpC]",8.4,1],["kmueFf_bjVvC_@",14.0,1],["anueFbzajV~@GvAQ",10.7,1],["qnueF|tajVrC]",8.3,1],["y`weFxqejVzC]",13.4,0],["ebweFngejVxC]",11.5,0],["a}veFleejVa@sG",7.9,1],["gcweFd}djVfAK",5.4,0],["m}veFd|djVlC_@",12.3,0],["mxveFbzdjVYcE",13.7,1],["g|veFjfejVrC_@",11.7,0],["yzveFtpejVdAKnAS",11.8,0],["ewveFldejVa@wG",7.6,1],["ovveFbeejVxC]",20.1,0],["ytveFloejVfAQ",23.2,0],["_rveFb_ejVQgC",11.7,1],["swveF|zdjVpC_@",16.7,0],["wrveFvxdjVa@uG",17.4,1],["erveFtydjV~C[",10.2,0],["upveF~cejVxC[",20.3,0],["qkveF`bejV]uG",20.1,1],["ulveFtwdjVe@sG",15.1,1],["ojveF`mejV]@i@Du@PQJETCzA",15.3,1],["miveF~lejVVA|B[",6.1,0],["mdveFxjejVQcC",13.0,0],["}~ueFxfejVIqA",12.4,0],["y_veFx_ejVSyC",18.7,1],["s`veFf~djVy@H",11.9,1],["k`veFz`ejVqC\\",5.6,1],["cfveF`bejVqCX",17.7,1],["_lveFpxdjVrC[",9.3,0],["}fveFlvdjVe@qG",20.9,1],["cfveFjwdjVpCY",7.1,0],["gaveFjudjVa@wG",21.0,1],["w{ueFjudjVsC\\",8.1,1],["gzueFp_ejVgAN",9.1,0],["ueveF|`ejVOS@KPQ?CAMEEOGCI@ELQBE?GCGUKAG@ILMBE@ICEUKCG@GPQ@ICEIIAE",18.1,1],["_gveFf}djViBN",12.4,1],["uxueFxhejVc@wG",12.3,0],["qzueFnzdjVOyC",28.8,1],["i{ueFbtdjVc@wG",17.7,1],["ozueF`udjVnC]",21.8,0],["muueF`sdjVe@wG",13.5,1],["gtueFn}djVMeC",10.7,0],["qtueFj~djVwC`@",10.4,0],["{rueFrgejVc@yG",6.9,0],["arueFfhejVtC[",10.4,1],["amueFlfejVe@yG",8.4,0],["unueFd}djVyC^",8.1,0],["knueFd|djVg@yG",16.4,0],["youeF|qdjVMyB",6.6,1],["apueFzrdjVwC^",10.3,1],["srueFnrdjVUmC",12.6,1],["aqueFh~djVRdD",11.2,1],["_nueFncejVuC\\",9.9,0],["_uueFxdejVWqD",9.2,0],["}uueFv}djVGs@",24.7,0],["uvueFhndjVgAN",25.5,1],["glueFbgejVtC]",7.3,1],["cgueFjeejVg@{G??",10.9,0],["qhueF~zdjVa@wG",6.9,0],["cjueFtqdjV}C^",17.5,0],["{iueFtpdjVc@uG",12.3,0],["}fueFdpdjVe@_H",13.9,0],["_dueFpodjVc@}G",15.7,0],["ecueFxzdjVsC\\",9.0,0],["oaueFddejVe@{G",7.9,0],["ybueFzydjV_@_H",9.5,0],["gaueFlydjV]yE",9.9,0],["s`ueFxqdjVyAP",6.0,1],["_cueFfpdjVrC_@",5.3,0],["}`ueF~ndjVc@}G",9.4,0],["}|teFtxdjV]wG",7.3,0],["o~teF~xdjVa@wG",7.8,0],["g}teFpydjVuBV",9.0,1],["m|teFt~djV}BV",10.1,1],["c`ueFzcejV_@_H",8.4,0],["{{teFzcejVyBZ",10.6,1],["q{teFzbejVe@yG",7.6,0],["e|teFjydjVtC]",7.0,0],["yuteFxaejVe@wG",9.3,0],["guteFrbejVnCY",5.3,0],["}jteFr_ejVc@{G",11.9,0],["glteFfudjVc@yG",11.8,0],["asteFbldjVW_E",9.5,0],["{xteFfndjVsCX",10.3,1],["gwteFnwdjVc@wG",9.5,0],["_xteFztdjVo@F",8.8,1],["crteFjwdjVoCX",7.0,1],["yqteFlvdjVc@yG",11.9,0],["ksteF`mdjVsC^",10.7,1],["{mteFzkdjVqC^",5.3,1],["olteFfvdjV{C^",5.0,1],["opteFt`ejVc@yG",10.7,0],["gjteFl`ejVlC]",7.2,1],["wdteFh_ejVpC_@",7.1,1],["y~seF~}djVrC[",7.0,1],["syseF`|djVg@{G",10.6,0],["_{seFzqdjVc@}G",8.2,0],["u|seFlhdjVwCV",6.8,0],["u_teFj}djVa@{G",7.0,0],["}`teF~rdjVg@yG",11.6,0],["ibteFvhdjVa@yG",9.5,0],["ybteFnidjVuC^",10.5,0],["_hteF|idjVc@yG",11.4,0],["}hteFredjVsAL",13.6,0],["chteFledjVhAO",8.6,1],["ghteFrjdjVyC`@",10.6,0],["ufteFntdjVc@gH",11.3,0],["agteFdudjVsCX",10.6,0],["keteFr~djVe@}G",9.4,0],["mhteFx{djVUuD",11.2,0],["afteF`udjVtCa@",10.5,1],["}sseFxzdjVa@uG",9.8,0],["_wseFdgdjVsC^",10.5,0],["wuseF|fdjVrC]",10.7,1],["upseFdedjVc@wG",5.8,1],["}oseFvedjVvC_@",10.5,1],["wjseFxcdjVe@sG",5.3,1],["mtseFlqdjVtCa@",12.3,1],["qnseFbpdjVtCY",10.7,1],["uhseFrydjVsC\\",5.2,0],["mnseFtzdjVsC\\",8.4,0],["anseFvydjVa@yG",6.9,0],["edseFbndjVoC^",7.1,0],["qeseFrcdjVsC\\",10.5,0],["}dseFvbdjVe@sG",5.9,1],["apteFrrcjVnC_@",10.9,0],["k_weF`|ejVvC]",12.1,0],["o~veFfffjVlDa@",7.4,0],["gxveF~dfjVrC_@",6.5,0],["}tveFzyejVsC^",10.5,1],["imveFhafjV_@_G",7.1,0],["ssveFryejVhCY",9.2,0],["qnveFxwejVW_D",15.6,0],["qgveFd`fjV]cG",7.9,0],["uhveFnvejVQ_C",13.3,0],["wiveFvnejVGc@",7.9,0],["_hveFdwejVrC]",9.3,0],["wbveFjuejV[yEM{@",21.8,0],["saveF|~ejV]aG",13.9,0],["_}ueFbtejVa@sG",20.0,0],["gwueF`sejVe@sG",19.7,0],["y{ueFz}ejV_@aG",13.9,0],["_vueFv|ejVa@eG",15.1,0],["cpueFn{ejVa@aG",13.3,0],["kqueFzqejVg@wG",18.6,0],["koueF||ejVrC]",5.3,0],["miueFv{ejVnC]",5.2,0],["weueFpoejVe@uG",7.8,0],["skueFtpejVe@sG",13.5,0],["kjueFnzejVa@iG",7.4,0],["ucueFrzejVpC]",7.1,0],["y}teFjyejVpC]",9.2,0],["qzteFdnejVmC\\",7.3,1],["_zteFbmejVc@wG",5.3,0],["gyteFzmejVfCY",6.3,0],["_oteF`kejVi@{G",7.1,0],["wsteFjwejVeCZ",5.4,1],["qiteFxiejVe@uG",10.6,0],["edteFvhejVa@yG",7.2,0],["a}seFfqejVQgCIyB",5.1,1],["ewseF`pejV_@cG",7.1,1],["ctseFnoejVe@eG",6.7,1],["iqseF|nejVc@gG",6.4,1],["onseFlnejV_@kG",6.7,1],["okseFtmejVa@cG",7.1,1],["qhseF`mejVa@eG",7.4,1],["ueseFnlejVa@eG",7.6,1],["wbseFzkejVa@aG",7.1,1],["{_seFfkejVa@_G",6.4,1],["scveFlzdjVI}A",9.1,1],["_hweFthejVxC]",8.3,0],["mwueFzscjVIkA",13.2,1],["wzueFnxcjVIkA",8.0,1],["chueFzpcjVEg@Ju@",11.8,1],["sfueFppcjVQcB",12.4,1],["m`ueFnccjV`AK",10.4,0],["{iueF`hbjVIkA",10.6,0],["scteF`ibjV|@M",9.9,1],["k`teF`objVhAM",9.8,1],["e_teFpsbjVKmA",9.5,1],["wmseFtvdjVv@I",11.2,1],["{cteFvldjVGeA",15.6,0],["ggteFvldjVl@G",14.3,1],["_hteFzldjVeAL",13.7,0],["ygteF~gdjVhAO",13.0,1],["_steFdidjVx@I",8.2,0],["gpueFr|djVKuA",14.2,0],["i_veFtcejVKsA",13.6,1],["ktveFvsejVr@K",21.2,0],["krueFb}djVImA",10.8,0],["m`teFxkcjVeAJ",10.4,0],["_pteFrmcjVJdA",9.2,0],["e_weFlffjVcAX",8.5,1],["_`veF~ifjV_@gG",7.0,0],["kzueFvhfjVa@cG",8.8,0],["stueFpgfjVa@cG",5.0,0],["orueFxrfjVrC[",11.5,0],["cwueFt}fjVrC[",6.4,0],["iqueFp|fjVtC]",7.1,0],["anueFfgfjVtC[",6.2,0],["wlueFtqfjVpCa@",5.8,0],["qkueFl{fjVvCY",7.0,0],["seueFjzfjVpC]",10.8,0],["_gueFhpfjVtCa@",11.8,0],["ghueFbffjVtC[",8.4,0],["obueF~dfjVtC_@",14.0,0],["aaueF~nfjVrCY",9.9,0],["{_ueFfyfjVtC]",15.4,0],["yyteF~wfjVlC]",16.8,0],["a{teF|mfjVjC]",15.2,0],["m|teFrcfjVnC]",11.1,0],["mwteFtafjV_@cG",5.1,1],["atteFxvfjVfC]",22.8,0],["ioteF`ufjVe@sG",9.6,1],["kuteFxlfjVhC[",15.3,0],["upteFzjfjVc@wG",5.8,1],["yvteFnbfjVjCY",11.2,0],["_rteFp`fjV_@_G",9.2,1],["snteFrufjVhC[",20.7,0],["witeF|sfjVc@oG",9.5,1],["}oteFtkfjVlC[",20.1,0],["akteFtifjVc@uG",16.4,1],["klteFp_fjVc@gG",8.8,1],["seteFvhfjVc@uG",14.8,1],["}fteFj~ejV_@gG",9.5,1],["mateFf}ejVc@eG",11.3,1],["a`teFngfjVc@yG",12.6,1],["y~seF|qfjVa@yG",9.6,1],["izseFjffjVc@wG",11.7,1],["s{seF`|ejVc@eG",10.2,1],["yzseFz|ejVrC[",7.7,1],["syseFdgfjVxC_@",10.3,1],["c~seFprfjVpC]",14.6,1],["ixseFjqfjVxCY",14.0,1],["itseFdefjVe@uG",9.7,1],["mqseFrdfjVc@{G",8.1,1],["_pseFtyejV_@cG",5.4,1],["qsseF|efjVpC_@",7.0,1],["krseFhpfjVvC_@",6.9,1],["snseF|cfjVc@uG",6.6,1],["yhseFvbfjVe@sG",7.4,1],["qkseFjcfjVc@uG",7.2,1],["}lseF~xejVe@}F",6.0,1],["ejseFlxejVa@aG",6.6,1],["igseF|wejV_@cG",7.3,1],["_hseFncfjVpC]",7.1,1],["kdseFfwejV]cG",7.7,1],["m~reFbvejVc@cG",7.7,1],["u}reFn~ejV@iAQkC",6.8,1],["qxreF~tejVa@}F",10.4,1],["s{reFjuejVa@yF",9.3,1],["}oueFflgjVQuC",14.6,1],["_pueFxfgjVrC]",9.5,0],["wnueFdqgjVrC]",5.3,0],["mmueFp{gjVrC]",8.3,0],["qgueFjzgjVrCa@",17.2,0],["{hueF`pgjVrC[",14.6,0],["cjueFtegjVpC[",9.0,0],["uaueFbygjVpC[",19.6,0],["acueF|ngjVrC]",20.4,0],["kdueFndgjVrCY",10.8,0],["}}teFzlgjVc@mG",14.0,1],["}{teF|wgjVrC[",24.1,0],["g}teFvmgjVvC[",19.4,0],["o~teFlcgjVtC]",19.1,0],["}wteFvkgjVa@qG",15.2,1],["uvteFbvgjVa@wG",6.0,1],["awteFplgjVjC]",11.7,0],["mxteFfbgjVnC[",20.5,0],["erteFpjgjVc@{G",5.8,1],["wrteF`agjVhCY",16.7,0],["cpteFtugjVfCY",6.1,1],["cnteFntgjVK}A",10.8,0],["kkteFxsgjVa@sG",6.5,0],["cgteFnhgjVe@yG",11.4,0],["kmteF~_gjVjC[",13.5,0],["ygteFx~fjVjC[",5.8,0],["ofteFfigjVhC[",6.3,0],["uateFlggjVc@yG",11.9,0],["kbteFt}fjVhCU",15.0,1],["o}seFl|fjVc@eH",5.3,0],["w|seFfggjVeCX",6.7,0],["g|seFdfgjVa@mG",5.5,0],["}zseFppgjVa@yG",7.0,0],["s{seF|fgjVrC]",8.1,1],["y|seF~|fjVnC]",13.2,1],["euseFnogjVc@cH",5.1,0],["ktseF~ogjVtCa@",6.2,1],["wuseFzegjVjAMnAS",14.0,1],["_wseFz{fjVvC]",16.0,1],["wqseF|yfjVe@}G",6.0,0],["_qseFtzfjVrCa@",7.9,1],["}kseFtxfjVg@{G",6.5,0],["woseFndgjVrC]",13.9,1],["onseFvngjVrC]",8.0,1],["uhseFjmgjVrCa@",11.2,1],["}iseFjcgjVrCa@",7.1,1],["afseFrwfjVe@_H",9.1,0],["gbseF~~fjVUuE",6.3,0],["wdseFhagjVc@eG",6.7,0],["a_seFd`gjVa@iG",5.9,0],["k`seFhvfjVc@gH",7.3,0],["e{reF`ufjVc@sG",7.9,0],["_zreF|}fjV_@oF",8.2,0],["qtueFr|hjVbCY",6.3,0],["ioueFp{hjVtC_@",10.6,0],["miueFhzhjVrC[",6.7,0],["cjueFtyhjVc@_H",5.3,1],["elueFtehjVzC[",8.6,0],["idueFlxhjVc@uG",6.9,1],["scueFfyhjVrC_@",5.0,0],["}dueF|nhjVtC]",10.7,0],["efueFpdhjVrC]",13.8,0],["y_ueF`mhjVa@}G",6.1,0],["k`ueFhchjVtC[",22.8,0],["c_ueFxmhjVtC]",16.2,0],["y}teFbxhjVrC_@",9.3,0],["_zteF~khjVa@{G",10.1,0],["szteFhbhjVvC]",22.1,0],["eyteFrlhjVtC]",15.9,0],["}wteFzvhjVvC]",17.0,0],["atteFrjhjVc@wG",15.1,0],["{qteFruhjVnC[",18.7,0],["isteFlkhjVpC]",15.6,0],["glteFnthjVhC[",18.2,0],["ogteFtrhjVa@wG",9.6,1],["qmteFfjhjVhC[",5.1,0],["kiteF|~gjVnC_@",8.5,1],["ahteFdihjVhC]",6.6,1],["qdteF~|gjVc@yG",5.5,0],["ubteF`hhjVjC[",11.5,1],["{cteFv}gjVlC[",7.6,1],["a_teF~{gjVc@{G",8.6,0],["o|seFrphjVc@{G",6.0,1],["w{seFdqhjVhC[",13.9,1],["c}seF~fhjVjC[",6.1,1],["qyseFzzgjVe@wG",10.0,0],["{xseFj{gjVnC[",8.3,1],["ysseFrygjVc@{G",10.9,0],["swseFxehjVnC_@",6.9,1],["gvseF`phjVnC]",9.3,1],["ipseFxnhjVrC]",6.2,1],["sqseFpdhjVpC_@",5.9,1],["olseFrbhjVe@}G",5.3,0],["ymseFnxgjVe@cH",6.8,0],["{jseFzwgjVc@cH",5.6,0],["igseFzwgjVtC[",6.9,1],["y{qeFjdhjVpC]",9.9,0],["avqeFdchjVtC_@",8.7,0],["yvqeFjbhjVa@{G",7.8,1],["qsqeFvlgjVg@}G",6.5,1],["gwqeFzxgjVpC]",7.2,0],["_qqeFdahjVc@uG",9.2,1],["irqeF~vgjVa@yG",6.3,1],["ekqeFb`hjVa@yG",8.2,1],["olqeF|ugjVa@{G",8.9,1],["skqeFnvgjVpC[",13.7,0],["_mqeFdlgjVpC[",9.4,0],["sfqeFttgjVc@{G",11.3,1],["_hqeFjjgjVc@yG",9.2,1],["igqeF`kgjVtCa@",9.6,0],["}eqeFhugjVpC]",9.4,0],["o_qeFv}gjVc@}G",7.6,1],["{`qeFnsgjVa@aH",12.1,1],["ebqeFbigjVc@{G",10.4,1],["}cqeFt_gjVeAL}AD",7.9,1],["{}peFf~gjVvBW",10.4,1],["a`qeF`tgjVrC]",8.6,0],["kaqeFvigjVtC]",9.2,0],["wbqeFn_gjVtC]",10.5,0],["k}peFd_gjV^vG",9.6,0],["c|peFhigjVb@xG",12.3,0],["gzpeFdxgjVPlC",8.0,1],["}xpeFh}gjVpC_@",12.7,1],["gzpeF|rgjVrC]",9.7,1],["qvpeFtegjV]sF",5.8,1],["yspeFh{gjVe@yG",7.2,0],["w|peFj~fjVrC]",7.5,0],["wupeFlggjVtC[",7.5,1],["mtpeFxqgjVvCa@",12.2,1],["cspeF`|gjVrC_@",6.9,1],["kmpeFvzgjVrC]",5.3,1],["iqpeF|{fjVtC]",8.7,1],["}opeFhfgjVtCa@",10.8,1],["snpeFppgjVrC_@",9.4,1],["{hpeFhogjVvC_@",5.3,1],["gjpeF`egjVvC_@",8.4,1],["kkpeFvzfjVpC[",10.3,1],["}qpeFf{fjVg@wG",7.2,1],["mmpeF~ofjVa@wG",11.6,1],["yapeFtmfjV_@uG",13.8,1],["{hpeFtdfjVc@yG",8.1,1],["_npeFpffjVtC[",9.5,1],["kspeFdqfjVa@wG",11.2,1],["stpeF|ffjVc@wG",11.4,1],["sqpeFjffjVg@wG",10.6,1],["unpeFxefjVe@{G",9.5,1],["oopeFn{ejV|AQr@S",7.6,1],["kupeFt|ejVrC_@",6.5,0],["ybpeFvafjVkDuE",5.4,1],["kppeF~xejV[kE",8.5,1],["ispeFxyejVYsE",5.9,1],["utreFtsfjVc@mG",11.0,0],["{sreFltfjVrC]",7.5,1],["{nreFlrfjVe@aH",8.3,0],["_nreFdsfjVrC[",6.9,1],["aireFjqfjVc@}G",6.5,0],["ihreFbrfjVvC[",6.5,1],["ofqeF|~fjVa@gG",5.3,1],["ugqeFfufjVa@qG",5.0,1],["mcqeF~~fjVc@_H",7.3,1],["sdqeFztfjVe@{G",6.0,1],["q`qeFh~fjVe@yG",9.3,1],["yaqeFdtfjVe@wG",7.6,1],["s}peFv}fjVa@}G",10.6,1],["{~peFpsfjVc@{G",9.2,1],["edqeFjufjVzC]",5.3,0],["wzpeFb}fjVa@_H",10.3,1],["_|peFzrfjV_@}G",9.9,1],["c~peFdtfjVrC_@",7.7,0],["m_qeF`jfjVrC[",5.7,0],["wwpeFp|fjVc@aH",10.3,1],["iupeFtwfjVSsC",8.4,1],["aypeFjrfjVe@yG",10.6,1],["ozpeFdhfjVa@wG",7.3,1],["uypeF|hfjVtCa@",7.9,0],["mxpeF|rfjVlAQjAM",8.4,0],["cvpeFtqfjVe@wG",10.9,1],["owpeFngfjVe@uG",9.5,1],["srpeFtqfjVrCW",5.2,0],["ovreFb`fjVpC_@",7.9,1],["qqreF`~ejVa@sG",5.4,1],["{wreFruejVpC]",7.1,1],["{ureFjtejV_@_G",9.6,1],["}rreFxsejV]cG",8.6,1],["wpreF|~ejVtCc@",12.7,1],["crreFptejVxC[",10.2,1],["_preFfsejVa@aG",6.9,1],["ksreFfjejVtC]",5.5,1],["_mreFprejVa@_G",5.1,1],["{jreFr}ejVpC]",15.0,1],["elreFjsejVrC[",10.7,1],["omreFbiejVpC]",8.4,1],["eereFn|ejVtC]",5.3,1],["{nreFb_ejVtCc@",5.5,1],["cpreFrtdjVtC_@",5.2,1],["oqreFnhejV[iG",5.4,1],["gtreF`iejV_@eG",6.7,1],["a}reFpldjVrCY",6.9,1],["}{reF~vdjVxC_@",5.2,1],["cwreFniejV]aG",5.9,1],["mzreF`aejVrC[",7.0,1],["a}reFzjejVa@eG",5.8,1],["kdseFlcdjVtCY",7.0,1],["_aseFlidjVfAI",6.5,1],["acseFxmdjVvC]",5.1,1],["seseFfycjVtC[",5.3,1],["}fseFbocjVtC_@",5.3,1],["o~reFhbdjVxCW",10.5,1],["w_seFbxcjVvC_@",6.9,1],["aaseF|mcjVrCa@",5.2,1],["sxreFjadjVvC]",5.2,1],["_zreF|vcjVxC[",6.9,1],["g{reFtlcjVvC]",5.3,1],["khreFjscjVpC[",5.2,1],["cgreFt}cjVtC]",7.8,1],["qbseFtccjV|C]",5.1,1],["_cseFz~bjVvCa@",5.2,1],["m|reFnbcjVtC_@",5.2,1],["gsueFzfijVbCY",7.5,0],["}mueF|eijVrC]",16.3,0],["yhueF|cijVa@yG",5.6,1],["chueFtdijVrC[",17.7,0],["_cueFvbijVe@wG",12.9,1],["ibueFncijVrC[",15.4,0],["e}teFtaijVc@{G",19.7,1],["q|teFjbijVtC]",9.4,0],["mwteFp`ijVa@}G",20.1,1],["wvteFdaijVvC_@",9.9,0],["mqteFf_ijVa@{G",15.8,1],["spteF|_ijVnC]",9.0,0],["ukteFb~hjVa@uG",9.3,1],["akteFv~hjVjCY",7.8,0],["meteFr}hjVfC[",14.9,1],["_`teFp|hjVjC]",15.3,1],["ozseFl{hjVhC[",6.0,1],["cuseFjzhjVrC[",10.1,1],["i{qeF~mhjVc@wG",5.7,1],["ytqeFnmhjVrC]",11.8,0],["aoqeFhlhjVtC_@",11.3,0],["}iqeFljhjVa@_H",7.5,1],["e~peF~ghjVc@yG",10.5,0],["o}peFthhjVtC[",7.2,1],["kxpeF|fhjVc@}G",10.5,0],["capeFdbhjVc@cH",6.0,1],["k`peFxbhjV|Fu@",6.2,0],["aapeF|}gjVpC]",5.2,0],["}woeFt`hjVQqF",9.8,1],["qxoeFzwgjVGwD",6.9,1],["yxoeFdqgjVKwC",7.4,1],["g_peFh}fjVjCM",6.6,1],["{_peFjxfjVlCY",8.8,1],["aapeFhnfjVjD_@",12.4,1],["{_peFz|fjVOwB",5.3,0],["ylpeFvpfjVtC]",8.4,1],["u{oeFzgfjV@oAGwB",5.8,1],["_|oeFt_fjVS}J",8.7,1],["wgpeFjvejVD_@?[",6.1,1],["yfpeF`{ejV?{@",7.1,1],["qlreFbv`jVoC{D",6.6,0],["wgreFzo`jVkEiG",6.1,0],["etreFfr_jV}AqB",7.1,1],["cvreFju_jV|@sA",14.8,1],["yxreFxx_jVVQf@}@",11.9,1],["izreFdq_jVcAeA",6.2,1],["s}reFzm_jV_@g@",6.2,1],["s~reFrl_jVaBwB]q@",5.1,1],["}fseF~t_jVqFsH",6.4,1],["ubseFfz_jVeB_C",7.0,1],["e`seFtc`jV{ByC",7.0,1],["e`seFfd`jVk@n@SHI?",9.3,1],["obseF`f`jVQGQQyAmB",8.1,1],["eiseF|c`jVpEkG",8.9,0],["alseFt``jVlAaB",5.0,0],["smseFl~_jVtEiG",7.2,0],["{aseFty_jVvAiB",12.1,0],["mcseFnx`jVjCoD",5.1,0],["uoseFzi_jVcBaC",5.8,1],["swoeFbfhjVGiC",10.1,1],["}loeFrdhjVWiK",13.1,1],["eloeFnehjVzBG",9.4,1],["{goeFddhjVWmK",9.9,1],["wmoeFxvgjVKuD",8.6,1],["enoeFbpgjVKsD",11.1,1],["uhoeFlvgjVWoK",6.4,1],["ggoeFbehjVzBK",9.6,1],["}boeFvchjVWkK",6.9,1],["sdoeFhegjVG{A",6.8,1],["{doeFjagjVMwD",6.2,1],["k}neFbdhjV`CM",5.3,1],["ixneFpchjVjBI",15.1,1],["gtneFfchjVjBI",12.0,1],["{}neFhchjVWmK",11.2,1],["wxneFxbhjVUiJ",10.8,1],["}aoeFvhgjVzES",6.3,1],["uyneF~rgjVSoI",5.1,1],["ayneFlpgjVvGU",5.4,1],["iyneFvlgjVzGS",6.7,1],["syneFzggjVzG[",6.1,1],["swneFtugjVtFY",5.6,1],["wnneFxtgjVxG]",7.7,1],["inneFr{gjVtGW",8.2,1],["qmneFtbhjVlG]",7.5,1],["soneFxfgjVxGW",5.7,1],["mpneFdyfjVzG]",7.4,1],["odneFvzgjV|G]",9.6,0],["{dneFvsgjVxG_@",14.3,0],["weneF~egjV|G]",19.2,0],["qfneFbxfjV|GY",14.3,0],["ganeFxdgjVYoK",6.0,1],["m|meFrbgjVS{I",9.1,1],["u|meFhwfjVbH]",6.1,0],["ezmeFr`hjV`HY",12.2,0],["mzmeFtygjVzGW",11.6,0],["}zmeFvrgjV|GW",17.7,0],["qvmeFbpgjVM}E",14.9,0],["awmeFvhgjVEmB",12.2,1],["mzmeFxdgjVpAG",20.6,0],["mwmeFdcgjVSsJ",16.0,1],["grmeF~bgjVWeK",16.7,1],["irmeFpfgjV@|@B`A",16.2,0],["_rmeFblgjVBr@H`@Vl@PVLHH@",14.5,1],["_qmeFhxgjVKsD",17.8,0],["_pmeFv_hjV|GY",17.1,0],["skmeFj~gjVWiK",10.2,0],["ypmeFbrgjVn@AXEPG^A",20.1,0],["ulmeFplgjVM{F",13.0,1],["uqmeFhdgjV|BE",16.9,0],["wqmeFncgjV|BG",18.6,0],["immeFlbgjVW}J",18.4,1],["mrmeFhvfjVxG[",15.8,0],["almeFvmgjVfBK",8.7,0],["ykmeFlqgjVxBM",18.4,0],["mgmeFbpgjVKaE",10.5,0],["khmeFdbgjVSeK",23.2,1],["ufmeF~}gjVWiK",11.1,0],["kkmeFlcgjVpAM",26.9,0],["}emeFz~gjVzBK",16.7,0],["yfmeF|pgjVxBI",6.8,1],["qbmeFtogjVGyC",15.7,0],["{emeFvbgjV`AG",9.8,1],["kcmeFxagjVSgK",25.1,1],["}ameFppgjVzBM",6.5,1],["sbmeFnbgjVxBK",21.8,1],["k~leFhagjVCiA",5.6,1],["o~leFn~fjVCuA",18.9,1],["u~leFrzfjVKqD",27.0,1],["ohmeFhufjVzGW",6.6,1],["}vleFl}gjVzBM",15.9,1],["{|leF~ogjVzBK",13.6,1],["qwleFr|gjVYgK",10.2,1],["{wleFpogjVzBI",11.5,1],["u}leFbbgjVxGW",12.6,1],["kxleFd~fjVhBM",16.4,1],["c~leFb{fjVzGW",8.0,1],["qzleFlwfjVbDM",7.6,1],["_sleFvvgjVM}E",13.2,1],["_rleF||gjVzBM",16.0,1],["wmleFr{gjVUkK",6.2,1],["{rleF`ogjV|BK",7.9,1],["wsleFfagjV`CI",5.4,1],["snleFv`gjVzBG",7.8,1],["aoleFxyfjVzBK",6.1,1],["_mleFj|gjVxBI",15.3,1],["{mleFrngjV|BK",5.6,1],["scleFtzgjVYgK",6.4,1],["acleFn{gjVzBK",5.5,0],["ycleFtmgjVvBM",12.0,0],["wileFj`gjVxBK",9.0,1],["cjleFjyfjVxBK",5.3,1],["aeleF|xfjVvBI",5.1,1],["qeleF~qfjVzBI",8.2,1],["o_leFllgjVYiK",7.5,1],["u_leFh_gjVvBK",8.2,0],["k{keF|}fjVWkK",5.4,1],["_ykeFnzgjV|BK",7.6,0],["}ykeFvlgjV|BO",5.9,0],["wtkeFhygjVUoK",5.7,1],["atkeFbzgjV~BQ",16.0,0],["uokeFvxgjVO}G",6.7,0],["wtkeFblgjVvBI",20.1,0],["opkeFzjgjVWiK",15.0,1],["mukeFjkgjVWmK",6.0,1],["gvkeFn}fjVYiK",6.2,1],["kqkeFd}fjVWoK",5.8,1],["gwoeFbmfjVW{J",6.6,1],["suoeFjgfjVjCM",9.0,1],["ipoeFrlfjVU_K",8.1,1],["c{oeFx`fjVnH]",7.1,1],["gxoeFl_fjVWcK",6.7,1],["wooeFzmfjV~GY",5.7,1],["sboeFbrfjVGiB",6.5,1],["g~meFzzejV|G]",6.6,0],["k}meFbifjV~BK",8.8,0],["mxmeFthfjVzBK",14.1,0],["_tmeFbgfjVWgK",5.4,1],["ismeFbhfjVzBK",14.0,0],["enmeFdufjVUgK",6.1,1],["comeFdefjVS}I",7.3,1],["etmeFzyejVvBK",12.2,0],["aomeFlyejVrBK",11.8,0],["yomeFrxejVYiK",7.0,1],["onmeFvgfjV|BK",15.8,0],["_jmeFpffjVWwK",5.9,1],["{jmeFbxejVUeK",11.6,1],["aimeF~tfjVMcE",14.3,1],["{hmeFfnfjVpBCdDQ",6.0,1],["kimeFhgfjVzG]",10.3,1],["simeFhcfjVzG_@",6.1,1],["yimeF|_fjVt@AdF[",5.3,1],["ijmeF~xejV`H]",6.6,1],["yemeFrwejV[gK",7.7,1],["a_meFzsfjVKwD",12.6,1],["m_meF~lfjVC?KsD",9.6,1],["auleFzrfjVMwD",20.5,1],["quleFblfjVIuD",10.2,1],["{lleFhuejVKkE",5.6,1],["kmleFhmejVGiC",5.8,1],["kuleFdefjV|G[",12.8,0],["suleFfafjV|G]",10.8,0],["{uleFz}ejV~GY",7.5,0],["_lleFfcfjVKsD",11.0,1],["mlleFf|ejVKiD",9.9,1],["atleFllfjV~FY",8.0,0],["}jleFnkfjVzBI",5.5,0],["efleFhqfjVUeK",8.6,0],["kkleFfdfjVxBG",17.7,0],["ealeFbqfjVYsK",11.2,0],["{kleFz|ejVlCM",8.7,0],["ableFdbfjVKuD",21.2,1],["mbleFl{ejVKmD",13.7,1],["{bleFhtejVKqE",5.7,1],["maleFbcfjV|GU",9.4,1],["e|keFnpfjVWoK",8.5,0],["cwkeFdpfjVYoK",5.2,0],["axkeFhafjVGqD",11.5,1],["mxkeFlzejVKiD",6.8,1],["ixkeF`tejVfBK",6.9,1],["kwkeFfbfjVvBK",7.5,1],["askeF|`fjVWmK",7.8,1],["_`leF`qejVCsB",8.8,1],["oqleFhhfjVDJD@xCO",12.5,0],["}vmeFvvdjVKkD",5.7,1],["wpmeFvvbjVGgC",9.9,0],["yzmeFxwbjVEiC",12.7,0],["mzmeFp}bjVEeC",9.5,0],["obneFv~bjVGoC",9.7,0],["ybneFrxbjVGkC",9.3,0],["yjneFhybjVGiC",10.7,0],["urneFdzbjVIoC",7.1,0],["uyneFfmcjVG{C",6.1,0],["iyneFbscjVGoC",6.3,0],["ayneFfwcjVCuA",5.4,0],["aqneF~vcjVEcB",5.0,0],["eaoeFfxcjVCuA",5.5,0],["kaoeFxscjVIiC",6.4,0],["waoeF`ncjVIuC",5.3,0],["gkoeF`xbjVF~B",13.5,0],["kkoeF|ubjVGmC",7.6,1],["ecoeFfubjVSkI",5.4,1],["yboeFzobjVxES",7.5,0],["ecoeFxibjVxEM",10.0,0],["scoeF~cbjV|ES",6.7,0],["}{neFhhbjVGgC",6.7,1],["i|neFhbbjVGkC",7.6,1],["s{neFdcbjVzES",13.2,0],["_|neFb}ajVzEU",11.7,0],["k|neFbwajV|ES",8.9,0],["szneFxpajVtCK",6.0,0],["yzneFbobjVvEQ",8.6,0],["g{neFdibjVfBIp@@`AP",9.8,0],["esneFtsbjVEkC",20.2,0],["ekneFprbjVG_C",16.8,0],["itneFnabjVEmC",11.6,1],["utneFl{ajVGgC",9.8,1],["_uneFjuajVIkC",10.9,1],["stneFbpajVzEU",8.0,0],["gtneFjvajVxEY",16.4,0],["_tneFh|ajVzEW",17.4,0],["usneFlbbjV|ES",9.7,0],["}kneFxfbjVGkC",10.5,0],["slneFtzajVGgC",11.7,1],["}lneFrtajVKmC",25.3,1],["kkneFrgbjV~ES",12.2,0],["wkneFtabjV~EW",10.1,0],["_lneFl{ajVzEQ",15.2,0],["olneFpuajVzEW",14.6,0],["wlneFhoajV`FU",12.8,0],["wcneFlkbjVEwB",5.5,0],["_dneF~ebjVGiC",6.1,0],["idneF~_bjVGkC",12.4,0],["udneF`zajVIoC",12.4,1],["ydneFpnajVxEU",20.0,0],["kdneFvtajVvEU",16.2,0],["cdneFzzajV~EU",11.8,0],["wcneFv`bjV|ES",13.1,0],["kcneFzfbjVpESLA",13.2,0],["k|meFd_bjVEeC",10.3,0],["_}meFdsajVIoC",21.9,1],["a|meF`zajVnDQ",9.8,1],["u|meFtmajVpGO",15.2,0],["qrmeF`majVpCO",12.0,1],["}smeFdsajVjES",19.0,1],["mqmeF|xajVXGf@I",19.6,1],["qxmeFj_bjVHF@LBFF@FEBK@MFCHDDNFDFABO@MFEFBFZJBFEDSBIFCX?X?JE",14.7,1],["gqmeFz}ajV\\e@nBgA",6.6,1],["wlmeFrwajVGkC",27.1,0],["ammeFtqajVImC",22.0,0],["almeFrcbjVAuABU",14.1,0],["mbmeFtwajVbDQ",9.7,1],["mfmeF|qajVvG]",17.1,1],["}lmeFplajVx@E",10.4,0],["qjmeFjlajVrKi@",15.0,1],["w{leF~|ajVzEU",5.0,1],["wkleFxfbjVGkC",5.6,0],["okleFlabjVnI]",5.6,1],["e}leFdpajVGkC",16.6,0],["{tleFluajVIkC",14.9,0],["guleFjoajVEiC",28.8,0],["{|leFzjajVfDOl@?",8.2,0],["ylleFttajVGmC",21.0,0],["cmleFrnajVEmC",21.4,0],["olleFloajVpFS",10.1,1],["clleFluajVjFS",7.0,1],["edleFxsajVAeC",13.4,0],["wlleFtiajVlDSp@O",16.8,1],["isleFfjajVl@[",17.8,0],["gpleFjiajVn@?ZD",15.3,1],["kdleF|majVEkBKq@",8.9,0],["cmleFd}`jVnDQ",16.0,1],["cgleFz{`jVUsI",13.1,1],["inleFn|`jVQqI",14.8,1],["enleFdq`jVvDQ",12.8,1],["{nleFfp`jVU{G",9.7,0],["}wleFn}`jVAWQWSYI[Ca@BY",14.5,1],["gyleFxw`jVP[rDeD`@Q\\Er@D",13.1,1],["s}leFzq`jVn@}@pGmFrAkA",13.3,1],["o}leF`jajVGcC",23.3,0],["ksleFncajVnAERGNW",11.4,1],["soleFvaajV?Ya@yA",13.5,1],["ewleFb~`jVlGW",11.3,1],["u{leFrdajVVIz@E",12.4,0],["exleF|cajVpBI",7.5,0],["}}leFz~`jVvCO",11.7,1],["m~leF|q`jVOUCWCuAGUSQ",13.9,1],["mcmeFpl`jVjAGLB",13.5,0],["sdmeFn_ajVxDS",10.9,1],["}dmeFjy`jVvDO",8.6,1],["uoleFdd`jVIeC",17.3,1],["}xleFjf`jVuBP",5.8,1],["aameFpe`jVUQc@G",19.8,1],["qkmeFtfajVhLe@",13.7,1],["g|leFndajVYCaMh@",11.9,0],["}}leF|cajVCkB",25.2,0],["cnmeFjz`jVfG[",14.1,0],["cgmeF|k`jV[CeCH",13.8,1],["iomeFpq`jVAuA",15.1,1],["yomeFfn`jVaCH",14.9,1],["_}meF|gajVpKi@",17.0,0],["o}meFzaajVxMo@",12.4,0],["{}meFx{`jVrDO",12.0,0],["q~meFto`jVvHa@",13.2,1],["itmeFzm`jVGgC",14.7,1],["}~meFvi`jVhGU",16.6,1],["}smeFvh`jVb@Gx@w@f@e@",6.7,1],["m}meFdmajVEgC",18.4,1],["y}meF~fajVGeC",7.8,0],["e_neF`o`jVIqC",10.7,1],["ycneFbj`jVvBI",12.0,1],["ufneFpp`jVlCO",8.2,0],["efneFpv`jVzES",12.3,0],["{eneFr|`jVzEU",18.1,0],["oeneFtbajVzEW",25.6,0],["ceneFrhajVvCI",15.2,0],["mmmeFvkajVGmC",25.7,0],["wmmeFneajVKoC",7.3,1],["cnmeFp_ajVEkB",21.3,1],["meneFxmajVGkC",19.7,1],["efneFvaajVEeC",17.1,0],["mfneFx{`jVIkC",12.8,0],["yfneFvu`jVGkC",10.2,0],["egneFto`jVGkC",11.3,0],["mmneFxnajVGqC",12.6,1],["ymneFthajVGeD",6.2,1],["enneF~aajVEsB",16.1,0],["ymneFh}`jVxEQ",13.6,0],["gnneFjw`jV|EU",10.2,0],["snneFhq`jV~EW",10.6,0],["}nneFhk`jV|EY",19.9,0],["}vneF`l`jVxEQ",12.2,0],["ooneFbl`jVHjC",6.5,0],["coneFfr`jVFjC",9.7,1],["wnneFdx`jVHjC",18.7,1],["_vneFd~`jVbFW",6.6,0],["{rneFfoajVEw@",10.0,1],["evneFbx`jVzEU",8.8,0],["qvneFhr`jV|EY",12.2,0],["{~neFvl`jVxEQ",8.6,0],["q~neFxr`jVzEQ",11.7,0],["e~neF~x`jVzEU",9.4,0],["ovneFj}`jVImC",14.2,0],["ewneFhq`jVKmC",6.6,1],["swneFfk`jVGiC",7.7,1],["iwneF~e`jVzEQ",12.2,0],["uwneF~_`jVbCIvAI",10.3,0],["mpneFf~_jVSiI",9.2,1],["eqneFhr_jVCoA",12.1,0],["iqneFdo_jVAq@",9.9,1],["oqneF`l_jVEmC",6.9,1],["qoneFnj`jVIkC",7.4,1],["ioneFje`jVxEW",18.1,0],["qoneFf_`jVvE[",16.3,0],["cqneFxf_jVzES",6.1,0],["wineFfe_jVE_C",10.9,1],["waneFld_jVIwB",6.1,1],["ogneFpi`jVIeC",11.6,1],["}gneFtc`jVImC",8.3,1],["q_neF|h`jVGkC",6.7,0],["}_neFzb`jVIiC",17.8,1],["i`neFp|_jVQgI",19.6,1],["i_neFtc`jVtMk@",14.8,1],["w_neFn}_jVvMm@",10.8,1],["{xmeFpj_jVzES",5.3,1],["gqmeFvc_jVvAITKn@EzAG",5.2,1],["spmeFvo_jV~BI",6.1,1],["o`meFty_jVQoI",5.8,1],["apleFf~_jVGcC",19.6,1],["mpleF`x_jVImC",7.9,1],["uoleF~x_jVjBEbF]fBO",5.1,1],["esmeFrl~iVFSZUX]L_@Bc@C{A",5.9,1],["stneFzchjVFlDRpG@v@Al@",10.3,0],["eoneFvchjVt@fB",5.2,0],["wkneF`phjVm@B",12.4,0],["qjneFvvhjViAF",7.3,0],["amneF`}hjVGsD",7.3,1],["omneF|}hjVaCJ",9.1,0],["erneFl~hjVgAD",29.3,0],["cuneF~zhjVSWWu@",11.7,0],["{xneFbdhjVFpCDb@HV",22.5,0],["emneF`bijVeDL",11.3,0],["euneFj`ijVGbA",9.0,1],["}lneFf~hjVD`B",12.8,0],["slneFrbijVH`E",14.7,0],["ilneFjiijVRhH",7.2,0],["wjneFbaijVk@gA",7.5,1],["ckneFxaijV_@@",6.4,0],["kjneFnbijVBhAD\\Ld@",12.0,0],["gineFbhijV?VEfBAdAI|@Gj@@X",9.3,0],["_ineFj}hjVaBH",6.2,0],["suneF`cijVIJEd@cBhE",14.9,0],["osneF`xijV?{C",7.5,1],["osneFrrijVBaD",11.3,1],["ksneFzlijV@}@DORG",8.9,1],["}qneFhjijVNNb@|A",7.6,1],["woneFrmijVMgF",11.9,1],["}oneFxnijVXtC",6.9,1],["coneFxtijVOfBV`CAT",19.0,0],["_lneFxuijVk@Im@m@",8.4,0],["skneFnsijVLjF",17.0,0],["ckneF`|ijVHjD",17.4,0],["wjneFzbjjVNhF",8.4,0],["cnneF~gjjVkC{@YS",8.6,0],["emneFnfjjVw@Y}@q@k@e@",9.9,0],["yineF|pjjVI}C",14.7,0],["iineFfyjjVO_F",15.9,0],["ioneFxrjjVzCc@",12.4,0],["usneFpsjjVrBU",7.9,0],["{nneFjzjjV[{E",12.6,0],["qrneFz{jjVjBU",8.4,0],["knneF~zjjVnC_@",9.4,0],["ysneFfmijVu@A_@BWJ",7.0,1],["_xneF~mijVu@Xg@NUDmAA",8.4,0],["c`oeF|mijV?pA",9.4,0],["k`oeFdqijVCfB@N",13.1,0],["q_oeF|pijVJ^tArA",9.3,0],["{wneFzzijVNuB",10.6,1],["gwneFnvijVHQVWDg@",19.0,1],["uyneFx{ijVOMe@e@",6.7,1],["c|neF~yijVWCe@HMEu@sA",8.8,1],["{`oeFp_jjV`@i@RG^LVVN^FTFC@OC_@?i@Do@L}@",9.0,0],["cxneF~|ijVa@bH",13.5,1],["w_oeFnejjVO}BWk@",6.5,0],["g_oeFdfjjV~ASX?p@\\",8.1,0],["}vneFzijjVkBR",11.6,1],["iqneF`mjjVyGv@mAf@aAP",10.1,1],["wxneFttjjVfC[",7.4,0],["yhneFzkkjViBR",11.3,1],["}pneFtlkjV[aF",5.4,1],["cmneF~gkjVKeB",6.2,1],["emneF~ckjVzBY",6.9,0],["wmneFjckjV]qF",7.6,1],["csneFh{jjV[cF",11.7,0],["qqneFzdkjVnBU",7.9,0],["_rneFfdkjV_@wF",5.6,1],["evneFvmkjVYaF",9.8,1],["wzneFnokjVhC[",5.4,0],["m|neFhfkjV]qF",7.6,1],["y{neF~fkjVdC[",6.0,1],["q}neFh}jjV[{E",8.4,0],["s~neFbujjVOwB",7.8,0],["{doeFrrjjVVxD",9.8,1],["{{neFtokjVqC\\",8.4,1],["gboeFngkjV]oF",5.6,1],["ifoeF|qkjVrCc@",9.9,0],["mmoeFthkjVrC]",5.5,0],["eioeFt_kjVWkD",15.8,0],["ajoeFbyjjVUiD",11.0,0],["ejoeF~rjjVrC]",8.2,1],["gcoeFhljjV`Gs@",7.1,0],["uaoeFj_jjVkA{B",16.1,0],["qaoeFf`jjVu@p@}Gv@",6.6,1],["}loeFn~ijVhD_@",14.5,0],["{foeFf}ijVNGx@{@",13.2,0],["qmoeF|}ijVM}B",19.8,0],["ejoeFzwijV`@Qx@yAp@S`@g@JU",7.9,0],["g~neFxnijV@S~A{D",14.7,1],["}zneFvgijVpC_Hl@_B",10.7,1],["utneFzzhjVZgD",9.4,1],["s_oeFxgijVNSn@o@j@qAhBsE",7.4,1],["y|neF|mhjVlCsA",5.5,1],["i~neF`ehjVJ~D",18.1,0],["{boeFlehjVJfDYrA",14.0,0],["}boeF|mhjVZIn@W",9.2,0],["scoeFhnhjVqA|G",11.7,0],["ofoeFpxhjVg@bC",15.5,0],["ohoeFr|hjVYoC?_@",12.0,1],["yhoeFfuhjVLs@@e@Ge@S[YMu@?",5.8,1],["aloeF`uhjVCsC",19.7,1],["gloeFpohjVGkC",9.3,1],["qloeFhjhjVIgC",7.6,1],["ggoeF`phjVQ_I",12.9,1],["u`oeFxgijV_FeHKW",6.3,1],["}hoeFj}hjVOEkAg@O?",13.2,0],["{joeFzdijVcCoA[[Q]m@kB",5.2,1],["gqoeFn|hjVnCM",9.4,1],["kroeFd|hjVa@iAiA}@",6.5,1],["wuoeF|vhjVPKxG[",11.5,1],["oqoeFnphjVxCM",15.8,1],["sqoeFhkhjVrCK",10.8,1],["qwoeFjghjVBpB",24.1,0],["mwoeFnlhjVCtC",22.4,0],["qwoeFjrhjVBpB",21.7,0],["o{oeFllhjVyAP",15.4,1],["a|oeFhhhjVUwD",16.6,1],["y_peFflhjVc@wG",13.1,1],["sepeFnmhjVc@{G",8.8,1],["_epeFjnhjVvC]",10.6,0],["gdpeFbxhjVe@uG",11.1,1],["qcpeFvxhjVrC[",15.0,0],["i~oeF`shjVhEi@",16.0,0],["o~oeF`whjVa@yG",13.5,1],["_xoeFrvhjVWHsAjAy@hA",9.7,1],["w}oeFd|hjVa@Xk@VU`@i@vB",11.5,1],["_cpeFtaijVa@gG",6.8,1],["w_peFrwijVxC_@",15.8,0],["k~oeFbbjjVvCa@",8.1,0],["eyoeF``jjVe@{G",6.2,0],["yyoeFlvijVfAK",25.3,0],["_`peFtuijVj@E^KZQ^s@",13.9,0],["m{oeF|qijV?a@DUPELDxA|C",8.8,0],["mxoeFx`jjVnIeA",11.3,0],["uvoeF~uijVbG~A",8.8,0],["wwoeFzejjVjI_A",10.9,0],["ewoeF`kjjVpIcA",10.6,0],["qvoeF`pjjVpI_A",10.0,0],["}uoeFhujjVnIaA",10.5,0],["auoeF`|jjVnIeA",5.0,0],["{{oeFnvjjVzC_@",5.2,0],["a}oeFdljjVtC[",8.3,0],["__peFflkjVtC]",6.2,0],["cfpeFdckjVvC]",5.8,0],["qapeFrwjjVtC[",5.8,0],["ybpeFjmjjVrC_@",5.2,0],["}ipeFpdjjVrC]",6.6,0],["cdpeFjcjjVvC_@",5.2,0],["gkpeF~yijVrC_@",10.8,0],["oepeFxxijVvC_@",6.2,0],["yfpeFnnijVtC]",7.1,0],["_hpeFddijVrCY",9.3,0],["olpeFtoijVpC_@",15.0,0],["{mpeFjeijVtC]",13.2,0],["eopeFd{hjVtCa@",12.1,0],["cjpeFfyhjVc@}G",10.8,1],["okpeFvnhjVa@yG",5.2,1],["ubqeFlshjVK_CWyC",6.2,0],["yzpeFlqjjV_@eG",7.3,1],["mtpeF|pjjVxC_@",6.4,1],["}xpeFl|jjVvC_@",6.3,1],["swpeFrfkjVvC]",6.0,1],["gvpeF|pkjVtC[",12.5,1],["eopeFdzkjVvCa@",7.8,1],["{zpeFn|kjV~IcA",5.6,1],["u_qeFf}kjVr@IbAE",7.9,0],["a`qeFp|kjVg@oH",8.3,0],["m{peFp{kjV_@aG",6.6,0],["c|peF~qkjVvC[",13.4,1],["{|peFhpkjV_@sF",5.1,1],["m}peFvgkjVvC]",15.1,1],["_~peFfgkjVe@{G",6.4,1],["w~peFn}jjVvC[",7.6,1],["k_qeF~|jjVc@_H",7.3,1],["o`qeFnxjjV{BV",6.2,0],["u`qeFrrjjV]cG",7.5,1],["uaqeFtojjV_CV",7.1,0],["mbqeFpijjVuC\\",7.4,0],["wgqeFpijjVc@wG",5.8,1],["ckqeFjkijVxC_@",7.1,1],["klqeF`aijVvC[",12.8,1],["amqeFn`ijVa@aH",6.6,1],["umqeFpvhjVtC]",5.5,1],["qhqeFrthjV_@wG",6.9,0],["_zqeFbxhjVc@uG",8.4,1],["kuqeFdnhjVd@zG",9.2,0],["wyqeF~yhjVb@vG",11.6,0],["oxqeFbdijV\\pG",11.3,0],["{rqeFraijVc@yG",11.6,1],["muqeF~wijVtC]",16.9,1],["wvqeFtmijVvC]",10.2,1],["}pqeFrlijVxC]",8.1,1],["qoqeFxvijVvC]",10.8,1],["gnqeF~`jjVrCY",8.2,1],["ctqeFhbjjVvC_@",13.2,1],["wrqeF|ljjVrC_@",8.4,1],["_rqeFxrjjVrC]",10.5,1],["eqqeFjxjjVpC]",8.9,1],["qpqeF|}jjVpC[",6.5,1],["ikqeFd|jjVSgC",7.1,1],["spqeF|bkjVQiC",8.0,1],["ujqeFtakjVOeC",8.3,1],["_pqeFlhkjVOiC",6.0,1],["yoqeFjckjVnC]",5.4,1],["coqeF~hkjVnC]",7.3,1],["onqeFrskjVOmC",7.6,0],["eoqeF~mkjVQgC",7.5,0],["cmqeFb_ljVO{B",9.4,0],["wmqeF`zkjVQoC",8.7,0],["a|qeFl}kjVtFo@",9.1,0],["}|qeFrwkjV~BSpDc@",10.2,0],["yrqeFvukjVlBY",6.3,1],["{|qeFv|kjVM}B",5.2,0],["k~qeFzpkjVUaD",5.5,1],["}`reFr}jjVSaD",5.5,0],["ybreF~njjVk@kI",6.6,0],["{}qeFfyjjVzBY",9.5,0],["e|qeF|gjjVCSOuB",6.1,0],["oareFtbjjVI}@SeA",8.5,0],["cxqeFjajjVO}B",6.5,0],["odreFlsijVxA_@hAQ`AItAK",5.9,0],["qyqeFvuijVMwB",8.8,1],["gzqeFdpijVYqB",8.4,1],["gzqeFhlijV~@f@",9.7,1],["_{qeFtgijVfAO",10.0,1],["ccreFhiijVbFm@",8.3,0],["ydreFzmijVlA_@jASbCO",8.2,0],["{breFp}ijV]cASw@",7.8,1],["udreFdxijVGeAC{@",15.4,1],["eereFvrijVIwB",12.7,1],["mereFdmijVv@cB",11.9,1],["kdreFbcjjVIq@Sy@c@oAW}@Mq@",6.6,1],["ygreF~wijVScF[_D",12.6,1],["ukreFf|ijVpByA",15.7,0],["_jreFbjijVCwB",5.3,1],["}hreFnjijVdC[",10.4,0],["ycreFvhijVGeA",14.1,1],["kireF~fijVtC_@",7.1,0],["ejreFpeijVa@aG",6.7,1],["gdreF~dijVe@sG",11.6,1],["qcreFxeijVrC_@",8.0,0],["_~qeFrgijVGkA",19.6,1],["{}qeFpdijVdAM",10.0,0],["e{qeF`dijV`AK",8.6,1],["m~qeF|cijVc@{G",14.2,1],["{_reFhyhjVa@uG",5.2,1],["uereFpzhjVO{CQaC",5.8,1],["soreFj}hjVtBS",5.6,0],["moreFngijVg@}G",5.7,1],["gnreFhqijVc@yG",6.3,1],["}lreFd|ijVc@cH",8.6,1],["gmreFp}ijVZdF",7.7,0],["cireFv`kjVPbD",5.9,1],["gdreFdlkjVnC]",8.8,0],["qdreFxrkjVrDc@",12.7,0],["{dreFfykjVvEm@",10.5,0],["_creF``ljVtDe@",8.0,0],["streFbiljVG_D",5.0,0],["}treFhbljVGcD",5.3,0],["kureFlukjVCkD",7.9,0],["oureFbokjVEiBGgAScB",8.3,0],["}vreF`ekjV]}B",6.2,0],["ijreFj`kjV_Ht@a@Aa@Y[Ue@G",7.1,0],["yrreFl{jjVpFq@",10.7,1],["{rreFztjjVzEk@",9.4,1],["gxreFr_kjV]aC",5.9,0],["oyreFbzjjVw@cF",8.7,1],["izreF~ojjVtDa@",5.5,0],["mqreFrfjjVrC_@",5.6,0],["{wreFbgjjV_@kF",11.5,1],["arreFxejjV[eF",11.7,1],["krreFz}ijVpC]",9.4,0],["a|reF|ojjVi@yD",9.1,1],["w}reFdhjjV[kF",9.6,1],["_yreFl~ijVa@{G",7.9,1],["y~reFr_jjVa@{G",5.6,1],["csreFh}ijVc@}G",7.4,1],["ysreFpsijVvC_@",7.5,0],["izreFdtijVc@}G",5.1,1],["mtreF`sijVe@aH",5.6,1],["aureFhiijVtC]",5.6,0],["ckseFfxijVrC[",6.8,1],["ujseFzajjVa@_H",5.8,1],["oiseFpjjjV]kF",7.3,1],["yiseFlbjjVtC[",5.5,1],["sdseFx`jjVc@}G",6.9,1],["ocseFlijjV]iF",11.1,1],["k|reFfqjjV{@i@mCgC",5.6,1],["igseFxujjVj@G",10.3,0],["kbseFn~jjVBc@HSVQ\\IdAM`BK\\E",7.8,0],["_aseFpakjVX?~@OvAKtAI",6.2,0],["ebseFpiljVsCZ",10.4,0],["}gseFrjljVgCZ",8.0,0],["qmseFfaljVlC]",10.8,1],["chseF``ljVrC[",9.0,1],["{nseF~vkjVlC]",8.1,1],["miseFzukjVtC]",6.0,1],["wuseFvmkjVjC[",11.2,0],["}vseFlckjVfCY",14.8,0],["alseFfakjVpC]",5.8,1],["{rseFbxjjVlC]",8.7,1],["imseF~vjjVrC_@",5.4,1],["gxseFfyjjVjC_@",7.0,0],["{xseFpxjjVe@aH",6.6,0],["qyseFrnjjVfCY",9.4,1],["uzseF~ejjVhC[",11.5,1],["{tseFzljjV[gF",5.7,1],["ctseFpmjjVjC]",9.9,1],["ioseFvkjjV]gF",6.2,1],["guseFxdjjVfCY",9.4,1],["woseFtcjjVpC_@",7.1,1],["}useFddjjVc@}G",6.2,1],["k{seFhejjVe@}G",7.5,1],["_|seFt{ijVjC]",9.7,1],["i}seFlqijVjC]",10.4,1],["ewseF~yijVc@_H",5.8,1],["ywseFhpijVhC[",10.1,1],["svseFpzijVlC[",8.2,1],["aqseFjyijVrC]",9.0,1],["uqseFvxijVc@sG",7.0,1],["cyseFzeijVjC[",6.0,1],["ssseFtdijVpC[",9.3,1],["u~seF~fijVnC[",14.0,1],["ijteFnhijVe@_H",12.1,1],["qiteFbiijVhC]",18.6,1],["cdteF~gijVhCY",10.1,1],["{bteFlrijVlCY",11.4,1],["cnteFztijVtC_@",12.9,0],["ihteFrsijVnC]",22.0,1],["}fteFz}ijVhC[",19.1,1],["mateFv|ijVhCY",12.1,1],["cpteFriijVc@yG",18.8,1],["ynteFdtijVa@uG",6.5,0],["ylteF`_jjVtC]",8.9,0],["kfteFngjjVc@wG",6.2,1],["qkteFbijjVvCW",13.4,0],["geteFhpjjV]eF",19.6,0],["seteFbhjjVfCW",15.6,1],["y`teFlfjjVg@_H",7.7,1],["w_teF`ojjV]eF",5.7,0],["i`teFbgjjVlC[",12.7,1],["}cteFxzjjVe@aH",17.4,0],["icteFn{jjVnCY",8.9,0],["m~seFtyjjVc@aH",13.9,0],["ebteF`ekjVs@_H",8.5,0],["uateFtekjVbCY",10.6,0],["c}seF~ckjVc@}G",8.4,0],["swseF~bkjVc@{G",8.0,0],["w}seFjzjjVjC[",10.9,0],["m|seFrdkjVhC]",12.1,0],["{_teFxokjVrBS",17.2,0],["}}seF|ykjV~AS",14.6,0],["{yseFdykjVnC]",20.7,0],["e{seF|nkjVjC]",12.7,0],["cuseFlwkjV_@wG",6.3,1],["eyseF|bljVg@_H",5.8,1],["mxseFlcljVhC[",14.3,0],["}wseFbmljVa@{G",8.5,1],["yzseFnmljVu@sG",19.1,1],["y|seFrcljVy@aH",9.2,1],["ydteFh{jjVSyAQa@WQ",11.5,0],["skteFvujjVc@OY]KY",20.2,0],["guteFtjjjVgAB",34.6,1],["qxteFbkjjVyCX",5.1,1],["}}teF`kjjV]qF",8.2,1],["m~teFtbjjVvC[",18.4,0],["oxteFpajjVtC[",23.7,0],["grteFfijjV]gG",6.4,1],["yyteFdwijVpC]",15.6,0],["stteFduijVe@wG",14.7,0],["iuteFpkijVtCc@",19.6,0],["ozteFnvijVc@wG",14.9,0],["e{teFtlijVtC]",15.9,0],["a_ueFbbjjVa@}G",9.8,0],["s_ueFjxijVrC_@",6.6,0],["i`ueFxwijVc@_H",7.1,0],["_aueF|mijVrC]",16.5,0],["uaueFdmijVe@_H",6.5,1],["y{teF~kijVg@{G",6.7,1],["avteFvjijVQiC",7.4,1],["wvteFteijVMwB",17.3,1],["slueFfpijVpC[",22.1,0],["ogueFhnijVc@{G",6.8,1],["yfueFdoijVvC]",17.1,0],["meueFnyijVrC[",9.2,0],["ikueFvzijVtC_@",15.8,0],["_hueFzbjjVImA",12.0,0],["{dueFfcjjVc@{G",10.5,0],["edueFxcjjVrC]",8.9,0],["{hueFrmjjVtCU",9.6,0],["_jueFzdjjVrC[",5.4,0],["udueFpdjjV\\hF",7.8,0],["}bueFtljjVtCS",10.3,0],["utueFrojjVrC]",7.2,0],["suueFlljjVQgC",7.6,1],["{oueFbfjjVtC]",5.9,0],["opueFv{ijV~BY",15.5,0],["yqueFhqijV~BY",13.3,0],["wuueFvojjV}CX",6.5,1],["{_veFt`kjVgAi@",7.6,1],["{`veFjdkjVsAw@",6.6,1],["_eveFvhkjVeAq@",7.9,1],["ykueFh|jjVRu@PYPK",5.5,0],["mkueFftjjV\\UXGxAKlAK\\@TJL^",10.5,0],["{fueFxfkjVRc@D[DgB",6.6,0],["abueF`ujjVTNXA",11.3,0],["g_ueFhpjjVL[ROV?TJHTFZCj@QzA",9.8,0],["u`ueFdhkjVL_@D]G_@G]@Y",10.4,0],["mcueFvikjVt@Up@Oj@G`@U^k@^w@Va@Pc@N_A",8.1,0],["wyteFn_kjVHq@Ac@Os@Bk@Ro@\\m@\\Ql@Cr@?",19.1,0],["a{teFrlkjVxFcHd@o@XS",6.3,0],["_qteFvikjVQU@MFSAUSk@",6.9,0],["}~teFjtkjVVeA`@{AJW\\c@",14.1,0],["acueFx|kjVReALMNAtNqAZ@PT",5.8,0],["a}teFz~kjV`@?`F]LIFMAa@",6.3,0],["qzteFj|kjVwCRaBNs@BYEs@e@",7.5,1],["_iueFnwkjVLg@f@uARS",12.1,0],["edueFzikjVW?MIYe@[]YMa@Cq@R",10.6,1],["weueFhlkjV{@g@_@Oa@Ei@N{@h@_@Ta@x@",10.0,1],["qiueFpwkjVKa@SUe@Q}@WUISWOa@",7.2,0],["mrueFzmkjV^m@^_@dAu@t@e@j@W",7.2,0],["seueFnkljVl@qB",17.3,1],["qsteFholjVi@GaAm@s@e@{@w@]MyAUo@UqB_A",7.3,1],["iuteFtgljVo@c@Y_@K]Ge@",7.8,1],["}nteFfaljVNYPS`@K`@I",5.2,0],["wnteFhbljVTNTHR?VMXW",6.3,0],["y|teFbuljVeAw@o@g@g@a@}@aA",6.2,1],["qpueFnbljVEQm@c@]UIK@QHMZE",5.5,1],["ykueFjwljVeFoD",5.5,1],["g|ueFtvkjVf@cBV]RUVKj@E",6.2,0],["_aveFjemjVeAqGw@oD",5.7,1],["e~teFrkmjVMf@i@Jg@F}@QiAg@yAiAk@a@q@S}@Co@Fw@[a@Y",5.1,1],["ckueFf{ljVl@Pb@?f@GdAMl@Gb@Nr@z@",8.7,0],["g~teFpjmjVa@q@o@}@m@y@Wi@Qk@?u@Rc@",7.2,1],["e}teFjhmjVmCqDCW",9.4,1],["s{teFffmjV}BcCY_@YE",9.2,1],["{mteFpfmjVeC?}@Vq@Pw@G{@o@o@q@qDqE",9.3,1],["itueFvhmjVwBuA",19.1,1],["gwueF|jnjVkB?kKo@",7.2,1],["cwveFj{njVf@KZe@b@kAj@c@l@q@`@g@b@eC",9.0,1],["ivveF|gojVJmA?u@NIL_@?_AOeAKe@",15.8,1],["}mweFjeojVn@g@p@Up@E~@Sh@S`@]d@w@`@g@V_@f@Sj@I^@",6.7,0],["i_weFzyojVj@|@x@r@z@d@hA^tA@",7.0,0],["qbweFtsojVe@uCO{ABo@t@uAb@}@f@{A\\gBXcA",5.1,1],["m`weFxqojVQ}@K_AA{@Ho@l@y@z@eBZ_AHo@i@eB",6.2,1],["k_weFzrojVd@GzCiC",6.0,1],["umveFvnojVEkAP{ANsAf@_BVM",6.0,1],["{lveFfnojVR_EL]dBaB",5.1,1],["edveFzmojVB{Au@uG",8.1,1],["mbveF`jojV[aEAu@Jm@xAk@l@WV_@",8.7,1],["ibveFzbojVD_@VIhB?b@Q`@]",6.8,1],["yeveFnaojVd@mA",5.4,1],["_dveFt~njVd@Ox@Qb@QX[@i@",7.3,1],["wdveFd~njVC[La@p@Q~Ai@",8.2,1],["seveFtunjV]mAEc@Fm@R]",13.5,1],["icveFtcnjV^c@CUW[",10.4,0],["emueF|vnjV{AFe@CyAeAS]Ck@T{A@c@Ks@m@w@",6.0,1],["m{teFhfnjVVMXy@h@_CLc@",28.1,0],["swteFd~mjVf@qATw@",14.4,1],["c{teFvwnjVc@Ya@Cu@\\m@@W]w@eB",5.2,1],["cdueFfmnjV@o@N_@\\GXD",25.0,1],["kcueFzrnjVaAqAkA}@e@Qk@PQ^SvASlASp@",8.2,1],["wiueFf}njVNi@Ae@OmA[g@OUWJ",9.9,1],["cwteFhiojVa@w@M_AGmAOq@a@cA]eAI}@",5.1,1],["ohueFpjmjV?^XZfAl@z@^|@Pn@Hb@C`@K`@c@",10.6,0],["_lueFpqojVj@_@t@cA`@{@",9.1,0],["{oueFnsojV]nBWtB[vD",5.4,0],["youeF~apjVLuBHkCTgAb@qAFsA",10.6,1],["uyueFl{ojVOg@DcB",6.9,1],["sxueFj{ojVD{@AmA",6.6,1],["oqueFrqpjVg@s@c@gA",15.9,0],["imueFhdpjV_DmA",14.7,1],["kdveFpipjVc@o@g@m@_As@wBaA",5.2,1],["mmveFhbpjVkAq@aAWgAA",7.1,1],["avteFt}pjVaCRg@M]Ya@iAe@s@aBY_Bo@g@]a@sAUU_@Ie@L{Bv@i@Es@g@",7.3,0],["outeF|{pjVBaAHcAZmAX}@h@iAt@_AnAgAj@]r@M`AW",9.4,0],["eiteFl`qjVJeARo@\\_@^cA`@wB`@oB\\cBPsAIo@[e@g@Ew@Hc@J",10.1,0],["ogteFfipjVc@oA[E",19.5,0],["moteFn~pjVXy@NsBt@cBp@g@f@S",10.3,0],["{jteFttpjVQwAHg@",16.0,0],["u~seF~cqjVRgBIg@GuA",12.6,0],["spteFt}ojVhAHr@?fAK",7.0,1],["mjteFr}ojVjB[r@Sd@?f@P",10.6,1],["_cteFt|ojV`CtA`@Td@F",6.6,1],["czseFj`pjVvEQn@M",8.4,1],["o~seFfpqjV?s@d@_E",7.1,0],["skseFjzqjVEoCSiB_@_B",7.3,1],["}pseFltojV?aAFo@b@e@",5.6,1],["koseFxnojVpAI",5.8,1],["cmseFfxojV@s@l@iB",7.1,1],["{hseFhqojVxCI",5.9,1],["glseFfyojVd@Ip@QnBGdAE",6.7,1],["epseF`|mjVvHS",5.9,1],["crseFrumjVxDO",8.8,1],["_vseFrzljVvCK",13.5,1],["epseFfzljVpCI",5.1,1],["qsseFvrmjVmAyK",8.8,0],["upseFbyljVo@qJ",8.1,0],["ekseFtxljVq@iK",8.8,0],["qeseFhxljVu@cL",5.8,0],["_gseFx_mjVEeD",8.3,0],["opqeFnkljVLGlBU",5.5,0],["ykqeFpiljVa@wG",6.0,0],["ihqeF|hljVa@sG",8.2,0],["ujqeFbtljV?Y]cG",6.5,0],["kdqeF|cljVQqC",11.3,0],["}_qeFdgljVa@uG",9.0,0],["m~peFdsljVi@oI",5.3,0],["e_qeFzgljVpC]",10.7,0],["a`qeFlaljVrC_@",9.7,0],["azpeF~eljVe@sG",7.1,0],["a`qeFjtljVpES",5.3,0],["oxpeFprljVk@}I",7.0,0],["stqeFj_ojVCeD",7.7,0],["usqeFxfojVhIW",6.6,0],["{sqeFb`ojVdIW",8.5,0],["etqeFfynjVhIS",5.2,0],["utqeF|knjVdIU",5.2,0],["yiqeFljnjVGcD",7.2,1],["yfseFttqjVzDI",7.1,0],["{jseF~{qjVfI]",6.2,0],["ooseFh|qjVdBE",7.7,0],["{dqeF`vqjVGcD",7.9,1],["geqeFloqjVGeD",13.6,1],["oeqeF|hqjVGgD",11.0,0],["ypqeFrcqjVrDK",8.3,0],["cfqeFr{pjVEkD",7.3,1],["ufqeF|mpjVG_D",7.5,0],["ggqeFr`pjVGeD",8.8,0],["}rqeFntojV`GS",8.1,0],["gsqeFlmojVhIU",6.4,0],["_|peFbyojVGyD",5.8,0],["k|peF`rojVEqD",6.0,0],["mzpeFrzpjVGgD",8.4,0],["idqeFvvqjVlIU",7.2,1],["adqeFp}qjVnIW",7.5,1],["qcqeFddrjVfIU",6.7,1],["}xpeFfoqjVhIS",6.1,0],["gypeFrhqjVfIW",7.6,0],["}mpeFzmqjVIgD",5.1,0],["qypeF`bqjVjIW",9.6,0],["wypeFh{pjVbIU",11.0,0],["onpeFv`qjVGoD",6.6,0],["czpeFttpjVhIW",8.9,0],["mzpeFzmpjVhIW",8.4,0],["yzpeFfgpjVjIY",9.6,0],["a{peFn`pjVhIU",9.7,0],["i{peF|yojVfIW",9.6,0],["s{peFtrojVhIS",5.4,0],["iwpeFvprjVdFM",6.1,1],["_wpeFnwrjV`EO",7.4,1],["wvpeFf~rjVjFQ",5.9,1],["kvpeF~dsjVfDO",9.0,1],["cvpeFrksjV~DM",8.3,1],["yupeFhrsjVrEO",6.5,1],["mupeF~xsjVjEO",5.9,1],["otpeF~ltjV~FQ",5.7,1],["mhpeFhfujVGeD",6.2,0],["chpeF`mujVGgD",6.2,0],["ctpeFbgujVGeD",8.6,0],["wspeF|mujVGgD",7.4,0],["qrpeFrhvjVEgD",5.4,0],["{rpeFzavjVEgD",6.7,0],["q}peF|vvjVIiD",13.9,0],["i`qeFxqvjVFKVINGF?",24.2,1],["}}peFbpvjVEaD",11.7,0],["c}peFzpvjVrDM",7.1,1],["m}peFdjvjVhIU",8.3,1],["w}peFncvjVhIW",7.1,1],["_~peFx|ujVdEM",6.7,1],["m~peF`vujVnEQ",9.0,1],["u~peFhoujVfIS",8.7,1],["__qeFthujVdIW",8.9,1],["i_qeF~aujVhIW",6.6,1],["m_qeFrnujVEcD",8.3,0],["e_qeFhuujVGeD",5.8,0],["{~peFb|ujVEiD",5.3,0],["s_qeFh{tjVfIW",7.6,1],["q{peFhttjV|DM",10.5,1],["w}peFtmtjVxFO",6.3,1],["q`qeFdgtjVhIW",5.6,1],["iaqeFpftjVGcD",5.5,0],["{`qeFp`tjVfIW",7.7,1],["eaqeFzysjVfIW",8.4,1],["oaqeFdssjVhIY",8.6,1],["uaqeFllsjVhIW",9.9,1],["ebqeFnrsjVEiD",6.4,0],["abqeFxesjVjIY",11.1,1],["ibqeF|~rjVfIQ",12.5,1],["ubqeFhxrjVhIW",10.1,1],["_cqeFrqrjVhIW",8.0,1],["icqeFzjrjVjIU",7.6,1],["{oqeFrwqjVjIW",6.8,0],["qoqeFl~qjVhIY",7.2,0],["qoqeF|jrjVGgD",16.5,1],["{oqeFjdrjVGkD",8.5,1],["ioqeFvqrjVEeD",7.8,1],["aoqeFlxrjVEkD",9.5,1],["slqeF~xrjVrGS",8.1,1],["{mqeFhssjVEgD",9.0,0],["ufqeFtgtjVzCM",6.4,1],["ggqeFlntjVtDM",8.6,1],["qkqeFnutjVhIY",5.6,1],["}jqeFzbujVfIY",9.9,1],["gkqeFd|tjVhIY",5.4,1],["sjqeFriujVfIW",9.4,1],["gkqeFloujVG}C",9.7,0],["okqeFvhujVCaD",6.6,0],["sjqeF||ujVGcD",6.0,1],["ijqeFhpujVfIY",9.6,1],["_jqeF~vujVhIY",11.6,1],["wiqeFr}ujVjIW",16.2,1],["miqeFjdvjVhIW",15.5,1],["{hqeFtqvjVrCK",11.4,1],["eiqeF`kvjVrCK",16.2,1],["icqeFrjvjVlCI",17.3,1],["moqeFnkvjVzCI",10.1,1],["kpqeFzdvjVnDM",13.2,1],["uuqeFzqvjVEgD",6.4,0],["}uqeFbkvjVEcD",9.6,0],["gvqeFndvjVEeD",5.4,0],["ouqeFn~ujVjIW",9.1,1],["uuqeFxwujVhIS",12.3,1],["_vqeFbqujVdIW",13.4,1],["ivqeFjjujVdIW",11.1,1],["wvqeFtcujVnIW",8.5,1],["}vqeF||tjVjIU",9.9,1],["iwqeFhvtjVnIY",8.6,1],["swqeFrotjVjIY",9.2,1],["{wqeFzhtjVjIW",11.5,1],["ixqeFfbtjVlIW",10.5,1],["oxqeFn{sjVtDM",11.8,1],["{xqeFxtsjVlIW",5.4,1],["krqeF`{sjVfCI",5.6,1],["eyqeF`nsjV~CK",5.9,0],["wrqeF|fsjVtBG",7.2,1],["esqeF~fsjVeEL",10.8,1],["{yqeF~yrjVbIU",12.3,0],["yzqeF~_sjVEmD",7.7,1],["a{qeFlyrjVImD",5.4,1],["kzqeFfsrjVjIU",10.2,0],["uzqeFplrjVhIW",9.0,0],["s`reF~lrjVzBI",6.0,0],["u`reFffrjVrBI",7.7,0],["eareFr_rjVxBG",6.3,0],["_breFrzrjV~DM",6.1,0],["}`reFfasjVdDK",7.3,0],["}ereFjhsjVjIW",5.1,0],["efreFhnsjVGoD",5.3,1],["egreFhzrjVGkD",7.1,1],["yfreF`asjVIgD",6.3,1],["}ereF`usjVGoD",9.6,1],["sereFv{sjVEiD",6.9,1],["iereFjbtjVGcD",7.6,1],["qdreFbctjVfDM",7.6,0],["s~qeFtbtjVjCI",12.3,1],["syqeFzzsjVEgD",5.5,1],["udreF|otjVQaK",7.4,1],["azqeF`itjViCH",7.7,0],["wyqeFvotjVcIX",9.8,0],["gcreF|}tjVrHW",9.5,1],["screFbwtjV~HS",10.5,1],["_creFpdujV~GS",8.3,1],["ubreFdkujV|FM",7.9,1],["kbreF~qujV~EM",9.1,1],["cbreFrxujVfEK",7.4,1],["qareFj_vjV`DI",7.9,1],["ybreFxwujVE}C",9.1,0],["q`reFthvjVEsB",10.6,0],["_`reFhivjVhBE",14.6,1],["gzqeFz~ujVtAE",5.8,0],["_`reF|tvjVOwI",11.9,0],["e{qeFbrvjVQqG",7.4,0],["c{qeFtsvjVD~ABjAFt@Nj@\\~@^x@\\x@Ph@Jj@D`@?|@?v@Bb@Jh@HVHLNHN@R?f@OfAe@ZU^k@PYTUl@c@b@a@x@oAb@c@f@a@",7.0,1],["ufreFzusjVe@H[Pe@l@e@x@e@bAc@nAYtA]vBSlA[nAa@dAm@lAa@l@u@~@w@r@o@Zo@X",6.7,0],["c|reFj_ujVj@~@Zh@Vh@^bA",6.4,1],["_xreFnfujVThARbAJ~@DdADd@L`@",7.3,1],["a`seFbytjVmA_B]g@OiACcA@eAJy@ZwAPcA^gBTeAHo@Dq@?m@Cu@EiBIo@Qo@Ye@k@i@SYQi@IkAGa@",7.0,1],["meseFplsjVOk@?YHWj@mA",5.2,1],["ccseFlesjVJ_@Jc@@c@A_@Gi@K}@",6.1,1],["abseF`}rjV`DK",6.1,0],["_zreFvdsjVLe@EsE",6.8,1],["svreFxasjVMsBCk@",7.0,1],["g{reFl|rjVjBE",6.8,0],["wureFtbsjVtAC",7.7,1],["orreFtasjVGeD",5.1,1],["isreF`arjV|CK",7.7,0],["_nreFr`rjV`DM",7.7,1],["}cseFrorjVkAHw@?g@@q@G",7.7,1],["goseF`crjVfBI",7.7,0],["ejseFhirjVfIU",5.2,0],["ojseFtbrjVdIW",6.6,0],["scseFtyrjVJyA",8.1,0],["okseFxwrjVW@[Me@_@WIo@A",6.1,1],["wqseFhmrjVVAXKVWTe@P]RI|@G",6.4,0],["mrseFjfrjVhAuA",6.1,0],["ulseFj`sjVOw@Ws@Qc@?OHELBJFn@`@\\ZLRNFN@PA",9.4,0],["ikneFhihjVnES",9.9,1],["cjneF~ohjVxDQ",8.3,1],["}hneFrvhjV|CM",8.2,1],["ycneFtnhjVImD",5.9,1],["c~meFznhjVzBM",7.2,0],["__neFtuhjVbDO",10.0,0],["kymeFlthjVKoD",10.6,1],["{xmeF`uhjV|G[",12.9,0],["gymeFhnhjV|GY",13.7,0],["uymeFpghjV|G[",17.0,0],["gpmeF~ehjVIsD",15.1,1],["_pmeFxihjVEmA",9.1,1],["yomeF|lhjVEmA",13.4,0],["komeFpshjVKoD",7.9,1],["wnmeFbthjVtDQ",14.4,0],["shmeFpshjVxAG",7.1,0],["gomeFlmhjVzGW",22.7,0],["someFrfhjVtFU",22.8,0],["mfmeFfehjV?]GoC",21.9,1],["{emeF~khjVEoA",12.4,0],["cfmeFrhhjVCcA",13.4,1],["kemeFprhjVMgD",13.6,0],["kemeFrehjVtEW",16.1,0],["_|leF~fhjVAeAG_AKgC",19.5,1],["k{leFpqhjVI}C",18.5,0],["e{leFtkhjV`CI",8.5,1],["uvleFljhjVKqD",18.1,0],["cwleFhchjVK_D",12.8,1],["evleFhkhjVzBK",15.1,1],["mqleFxphjVIgD",7.2,1],["eqleFxjhjVzBM",6.8,1],["ygleF~hhjVIiEM_E",6.0,1],["ybleFjhhjVWgK",5.8,1],["cbleFhihjVxBI",9.9,0],["y}keF|ghjVUgK",7.9,1],["e}keFzhhjVzBO",12.2,0],["yxkeFpghjVWgK",11.9,1],["_lleFfwhjVWcK",7.2,1],["_gleFzvhjVWcK",7.7,1],["_bleFhvhjVYcK",9.3,1],["kaleF|vhjVzBK",13.0,0],["a}keFzuhjVUcK",10.6,1],["k|keFnvhjVlBI",19.5,0],["axkeFluhjVUcK",12.4,1],["kwkeF`vhjVzBK",9.9,0],["exkeFhhhjVzBK",14.6,0],["_skeFzthjVWcK",10.3,1],["{skeF~fhjVWeK",14.4,1],["krkeFpuhjV|BK",22.4,0],["cnkeFlthjVUgK",14.1,1],["eskeFzghjVzBM",12.1,0],["}nkeFnfhjVIeAGWCeB",7.5,1],["mokeFv}gjVC}@",19.4,1],["ookeF~oijVU?SISKIMQa@]q@Oa@CW@]JWLe@Nc@BQA_@Iq@Gg@@_@Dw@",10.6,1],["uukeFroijVSc@[cAOw@Gu@A}@AsH?sE",12.2,1],["kmkeF`nijV[sAQ{@Ie@?c@Fm@",7.5,1],["{nkeFzoijVd@Y",13.9,0],["skkeF~xijVJUHc@?c@Ee@U_Aa@eB",6.8,0],["{lkeFdyijV}FiG",11.4,1],["crkeFvvijV{@?",11.6,1],["etkeFdvijVY{C",13.1,1],["cnkeFt{ijVLKPGX@",9.5,1],["e{keFxqijVB~@",29.0,0],["}ykeF~pijV~BK",12.1,0],["i{keFrpijVKoD",23.6,1],["y{keFxiijVIgD",6.9,1],["e|keFbcijVKiD",16.0,1],["u|keFn|hjVGkD",11.5,1],["qeleFvdijVvGY",12.6,0],["geleFjkijVzGU",6.6,0],["wbleFv}hjVrDO",13.1,0],["kdleFdrijVtDU",7.7,0],["ieleFrqijVKqD",28.3,1],["yeleF|jijVIqD",19.1,1],["cfleFddijVMkD",11.3,1],["yeleFjrijVmBDOC",12.8,0],["ojleFxpijVQ}I",26.5,1],["ooleFveijVxBK",6.9,1],["qfleFn}hjVIqD",11.1,1],["ckleFrdijVWaK",10.8,1],["ekleF`qijV]Qe@As@L",8.3,1],["soleFbpijVOsH",21.0,1],["epleFdeijVWeK",10.0,1],["ipleFjxhjVxBK",8.9,1],["wpleFtpijVYWYa@i@]WO",10.2,1],["{tleFllijVGmD",19.2,1],["euleFveijVYgK",11.8,1],["quleFtlijVe@]]e@[c@k@c@",11.0,1],["gzleFdfijVIqD",21.2,1],["szleFh_ijVIgD",8.7,1],["_{leFrxhjVIwD",7.4,1],["aqleFtwhjVIwD",8.0,1],["o`meFjcijV[mAIo@SwC",13.1,1],["y`meFp`ijVtDQ",5.2,1],["obmeFjyhjVQqD",9.1,1],["qgmeFnfijVU{AEc@",14.0,1],["_omeFdzhjVIgD",15.1,1],["qhmeFfaijVKaE@MFE",16.1,1],["ylmeFtzhjVHGrAC",10.1,0],["_lmeFbiijVuC]",9.8,1],["ammeFp~hjVD[CoA",8.6,1],["aumeFn{hjVbBI",15.1,0],["gqmeFrsijVPa@NQDS?m@",12.0,1],["cpmeFloijVEIkAE",21.8,1],["uomeFtoijVz@C",21.0,0],["gumeFxyijV@SMiATaBh@}A",10.5,1],["usmeFznijVcCI",8.3,1],["k{meFb~ijVp@{C",8.2,1],["{ymeFfxijVe@o@Ue@Om@",14.7,1],["u{meFrsijVdB@",15.3,0],["qvmeFv{ijVyA{A",19.7,1],["cxmeFjvijV?mA",14.7,1],["k|meFhsijVIwB",8.5,1],["w|meFxnijVEcC",5.5,1],["a|meF`oijVhBO",19.7,0],["kxmeFbnijVCu@",14.2,0],["uxmeFpjijVIuC",12.9,1],["oxmeFdeijVZU|@ELS",13.2,0],["eumeFd`ijVE_C",6.2,1],["mxmeFt{hjVvAC",20.9,0],["_ymeFzdijV@u@Fq@",11.2,1],["uxmeF|`ijVGsC",11.7,1],["_}meFziijVW}K",9.3,1],["k}meFd|hjVxBI",17.2,0],["_ymeFf{hjVIoD",11.3,1],["q}meFt|ijVYq@qAaC",12.3,1],["kaneF`vijVC_@Q}H",9.4,1],["k`neFpjijV|AE",6.0,0],["abneFbjijVG}A",13.2,1],["mbneFveijVOkG",7.1,1],["aeneF`gijVv@G",9.4,1],["_gneFd}hjVnBI",10.6,1],["ghneFp|hjVUiAU}A",5.3,1],["mfneFdgijVkAH",17.8,0],["ajneFraijVzAC",13.5,1],["yeneFpfijVA_C",7.1,1],["odneFtwijV[sBA_@",11.2,1],["ggneFlyijVa@}Ao@iB",6.5,1],["geneF|qijVMg@AeA?aD",9.1,1],["qfneFvyijVzBiA",15.5,1],["acneFx{ijVc@Ck@?QGYa@",5.7,1],["sjneFr{ijVv@n@z@Tb@KxA]",9.2,1],["waneFxgjjVKsF",13.3,1],["ixmeFbgjjVS?uAo@a@YQWc@eAg@qAWe@m@q@",8.0,1],["a|meFf_jjVa@U_@g@o@iAeAiB",10.2,1],["ianeFthjjVhAJfAF`B?d@?XKLSDe@",6.9,1],["c`neFlljjVi@QeBw@",11.3,1],["uymeF`ljjVy@AkBE",6.9,0],["awmeFnejjVNi@p@oBH[Bm@",6.3,1],["wumeFx|ijVVs@X{@\\q@",7.8,0],["i_neFvljjVn@Pf@TXR",15.7,0],["c{meFhojjVPRJTNj@",13.3,0],["azmeFjojjVTTNBXCv@Sj@OLKXq@NM`@C\\[\\g@\\u@Pw@",6.3,1],["oqmeFzgjjVb@Yf@U",8.9,0],["kvmeFbfjjV~@q@XEn@ARIRWD_@CYEU",8.8,0],["eqmeFf`jjVK_@AYBYJUbAy@X[\\gANYRI`B_@",6.0,0],["knmeFv_jjV{Am@",14.8,1],["mimeFn|ijVHIH@NH",20.5,0],["iimeFjkjjVFu@LgB@YCUQ{@Mk@C[?WHi@",14.0,1],["agmeFpsijVqAiC",26.1,1],["ccmeFvrijVm@sAe@qAq@eC",11.4,1],["kjmeF|nijVH[H_@Dw@Fo@Tg@NO",7.7,0],["}pmeFvtijVVWj@a@~@m@^[^]",7.8,0],["qgmeFxgijVXK\\@\\F\\Tx@j@",12.7,0],["}bmeF|{ijVDXV^PPTHP?ZGXK\\A",12.7,0],["{sleFp}ijV`AoC",22.7,1],["cfleFltijVnAR|AX",18.2,0],["qcleFjyijV[Ok@KWM{AkA",5.2,1],["adleFtdjjVeAmA",8.6,1],["gfleFnajjV@_@A[AK",5.7,1],["yeleFz~ijV\\BV?VGJE",8.3,1],["sbleFl~ijVfAo@",8.7,0],["cdleFlejjVYJW@e@OiAa@c@IY?WLa@R",11.4,0],["{fleFtajjVs@Yc@Ic@C",12.2,0],["sfleFvbjjViAa@a@Ea@?]Fs@`@_Ab@a@ROD",6.9,0],["uqleFthjjVNZPNXHR?RGZQ",10.1,0],["mlleFxhjjV\\OVEZCPB~@Z`A\\l@PVFLGRSLW",7.0,1],["a}keFzbjjVR]J[Fi@",7.8,1],["s`leFnbjjVhAuA",9.5,0],["oaleFhejjVu@`AOFSCiBe@w@Qc@Ge@F[N",8.1,0],["e{leFx{ijVYIGKEW",14.4,1],["qpmeF`sjjV`A{@Z[Xg@Ta@XS\\MVO",9.4,0],["_omeFbnjjVZ}@R]?O",20.4,1],["wrmeFttjjViBh@[@o@E",6.0,1],["cymeFlujjVImA",11.7,1],["sineF~jjjVdAm@VGP@",6.3,0],["gineFnqjjVzBW",6.7,0],["{dneF~ojjVKoD",12.0,0],["uhneFvyjjVvBU",13.5,0],["kdneFdxjjVMyE",11.5,0],["wcneFxxjjVjBS",19.5,0],["ycneFjakjVOsF",6.4,1],["chneF~bkjVxBW",18.5,0],["ecneF~akjV~ASVEJKp@_CJ[",16.8,0],["q|meFnzjjVM}D",16.7,0],["sgneFtkkjVpJkA",18.3,0],["w{meFvhkjVGmB",11.1,0],["_|meFrdkjVOcG",8.4,1],["esmeF|pkjVM_@ScA_@cBa@aBScA",15.9,1],["ysmeFb|jjVCmBBWHQNQLMLUDO",18.6,1],["csmeFb}jjVnBrB",20.7,0],["comeF``kjVQ_F",6.1,1],["ckmeFxekjVkByB",17.0,1],["gkmeFpzjjVEwA?{@",19.4,1],["_imeF~}jjVNYPMXCj@@",7.3,1],["cameFdckjVkAgAQU",7.8,0],["wzleFb|jjVUw@Km@Ic@QWWK]@SN",12.8,0],["wyleFbfkjV_@SMY[w@a@mAUk@QS",7.6,0],["owleFdckjVuA_E",5.6,0],["k{leFlojjVaBr@uCr@Y@YMOSAYJUb@q@d@u@Nc@Dc@C[Ii@Km@Ew@Gi@Kg@KYQKQ@QJEPAR@TRt@DP@N?REVOXg@j@c@d@QPGB",8.3,1],["egleFr_kjVr@B\\Bd@F",9.2,0],["geleF~xjjVXp@\\`@h@Vt@Tp@P`@@h@I\\SR]@]Oa@]a@w@m@wAaA]YIUC_@FYh@eCNu@b@{@h@_Al@wAVYVKV?PHNXHX@^E`@Ul@aBhCS`@G\\?VFPJL^TbD~An@X|@h@t@R~@Xr@Vd@RXXFN",5.1,1],["ckkeFz|jjVXf@Tr@L^Hl@Bn@",8.9,1],["wokeFnfkjVd@_@d@c@JWF[?_@?}A",15.0,1],["slkeFb~jjVVk@",6.3,1],["wmkeFbrjjVy@Oe@AeADUAMGGG",16.2,0],["wtkeF~pjjVa@Fm@G[IUSGM",11.5,0],["mpkeFbfkjVSc@AW?K",12.9,0],["gtkeF|ikjV]s@EUA[?oB?a@",14.7,0],["kxkeF~kkjV[kB?[",18.2,0],["svkeFdzjjVjH~B",17.1,1],["}qkeFthkjVyBpB",9.6,1],["imkeFhmjjVeAMKG?SJy@Dq@@a@A_@",10.8,0],["sskeF``jjV|CO",14.7,1],["ukkeFbljjV[}Ca@kF",5.9,0],["ewkeFn`jjVi@BQI}@_@",12.3,0],["cwkeFz_jjVAg@EI",12.9,1],["mukeFdfjjVGaAQ}A",10.8,1],["stkeF~ojjVK}@DS`@sAL}@BaA",9.5,0],["kskeFxdjjVK_AGaA",8.7,1],["ywkeFpmjjVV_@Vk@Nq@Jq@?Q",6.9,0],["etkeF|zijVs@Hi@Gy@g@s@c@y@o@k@OqAU",6.5,1],["skmeFb`jjV~@iB",10.0,0],["_wleFtnkjV_AkDGa@?i@",11.0,0],["qxleFhekjVPWXQ`@Sb@GZCb@F\\P",6.3,1],["evleF`okjVZ_@`@URM",10.7,1],["msleFblkjVs@kC",5.8,0],["wmleFx~jjVbANt@Hx@?",7.7,0],["eqleFnckjVXY\\In@Ap@Bv@Ht@DxAA~A@v@?ZEVS",9.8,0],["snleFljkjVp@l@v@Xt@DZA",9.7,1],["khleFlikjVtA?pA?t@?p@@",6.6,0],["}oleFbfkjVn@Qt@@j@Fd@Hp@AjF?dA@\\Fh@RRBlA?",6.1,0],["_|keFvlkjVfBA",7.4,0],["eykeFtfkjVAgC",18.9,0],["oxkeFb_kjVh@mC",12.4,1],["g}keFxlkjVkI?",10.7,1],["uwpeFvsljVb@Dj@\\fAbALH",6.9,0],["erpeFjvljV]cCSyAKyA",5.0,0],["qlpeFrepjVGaBMoCGoAA{@JgB",5.1,1],["_cpeFnhpjV[KKOMk@ISIKKGY?",7.1,1],["cdpeFfbpjVM_ACg@Bo@LgA@o@?u@@[?WCU",8.8,1],["aloeFdnpjVpBkAr@Yd@K",6.3,1],["wfoeFvypjVr@_C\\kAJe@C]Ks@",5.3,0],["afpeF|xpjVe@t@]`AQvAG|AI|BIjBA`B@~A",6.1,1],["_`oeFjltjVQ]g@sAgAyBeAwBOi@",5.4,0],["}boeFhnqjV_@_Ag@k@[S[M]C",12.2,1],["_~ieFn`_jVzDmI",8.7,0],["k|ieFlq~iVwAiA",7.4,1],["mxieFxt~iVyAmA",14.4,1],["mwieF~t~iVxAaD",5.9,0],["ktieFno~iV~@kB",14.4,0],["qyieF`c_jVjDoH",9.2,0],["i{ieFlq~iVhEkJXg@^a@NK",9.2,0],["}rieFdb~iVEc@Fo@J_@Xk@Pa@Jc@LcA",7.9,1],["{oieF|v}iV?UGYOOQEYD]H]@a@K",10.4,1],["cvieF`~}iVPFTKNWPc@",5.3,0],["{mieFzl~iVSa@Km@Em@Do@Ji@Pk@R]",5.2,1],["yqieFtb~iVb@Uh@Ol@M",9.1,0],["ylieFv_~iV?c@Fy@RgADa@?g@",10.6,1],["klieFpl~iVn@sAj@mA",5.5,0],["ciieF~f~iVVo@Li@De@?g@Ck@",6.6,1],["ygieFn}}iV?o@Dw@B[",9.9,1],["}uieF|r}iVj@gAVU",13.8,0],["msieFvo}iVPGXA",39.0,0],["uqieFno}iVTHPJ",17.5,0],["wmieFfo}iVCeG",15.2,1],["knieFdf}iV_A?g@GWKQQ",10.9,1],["gmieFbf}iVdA?",11.8,0],["qjieFpn}iVEsF",11.2,1],["kjieFtp}iVCg@",9.3,1],["_jieFdf}iVdDB",15.7,0],["seieFll}iVTm@Ly@BeA",5.7,1],["mbieFjf}iVvAAz@H",12.0,1],["}|heFff}iVzDmI",9.9,1],["azheFvr}iVYN]CSMIQ@MxBsE",10.1,1],["gyheFni}iVU?a@S",11.1,1],["cxheFpi}iVREzBu@",14.4,0],["qrheFjg}iV^I~@_@`@G",14.4,0],["usheFlo}iVJe@Js@FaAAs@",11.5,1],["myheFlw}iV|@_An@}@f@{@Tm@",6.5,1],["uxheFf{}iVKc@Ym@",10.2,1],["}fieFb_~iV|A]jBo@`B{@|AiA",8.1,0],["syheFvf~iVgAXcATO@",11.4,0],["sxheFte~iVTyAFc@@e@",10.9,0],["gwheFzh~iVu@eA",10.8,0],["e{heFjl~iVrBgA",6.6,1],["ifieF~u~iVv@cBXa@r@s@x@k@`A_@rAe@",12.8,0],["alieFbn~iVl@Jn@@p@Q^QXa@\\k@Xo@TUd@Q\\GX?",11.3,0],["ygieFfv~iV]Ms@Ce@O_@[Ug@Iq@?{@Ha@",6.6,0],["upieFds~iVTFX@TAHA",12.3,0],["qnieFpd_jVdA}B",13.0,0],["wkieFl__jVpC_G",11.7,0],["ygieFzb_jV~DkI",7.6,0],["_dieF`v~iVt@p@",14.8,1],["utieF|d_jVjCwF",9.4,0],["}kieFn`~iV~A[",10.0,0],["{jieFlh_jVjAgC",7.6,0],["{eieFbj_jVh@mA",8.1,0],["{cieFnf_jVvBqE",7.2,0],["{_ieFl__jV~@mB",12.4,0],["caieFnw~iV~AeD",14.1,0],["_`ieF`j_jVbEqI",7.2,0],["a}heF`|~iVvAnA",5.6,1],["gyheFn~~iVjB}D",8.5,0],["g}heFxz~iV|DoI",10.9,0],["ovheF~i~iVHVFZ?f@Il@",10.4,1],["ovheFfp~iVxAnA",20.9,1],["qrheFts~iVzArA",17.8,1],["}{heFjm_jVxDkI",6.6,0],["cwheFfo_jV~AmD",6.6,0],["orheFle_jVwAkA",8.5,0],["mqheFlf_jV|ArA",5.8,1],["qnheFfw~iVxAnA",9.9,1],["wjheFvz~iVzApA",6.3,1],["wfheFh~~iVxAnA",6.3,1],["{lheFxr~iVrAsC",5.8,1],["mdheF~c~iVfA}B",12.3,1],["ieheFh|}iVzAnA",17.0,1],["kaheF|_~iVvAlA",7.1,1],["ahheFpk~iVt@l@",18.7,1],["gtheFrk~iVDq@Lo@d@w@",8.7,0],["ssheF`e~iVZRVLZDVE`@Qn@u@",11.2,1],["wpheFl|}iVn@cBb@}@V_@",9.5,1],["slheFtu}iV^a@d@[f@Sl@A",11.6,1],["afheFp{}iVS_@Uq@E]@}@FoA",12.2,0],["omheFjr}iVX[VO\\Q\\[HQ",6.8,1],["oiheFnn}iVH_@?e@?_@",5.5,0],["gkheFvi}iVp@\\",8.6,1],["ieheFl{}iVfA_C",7.9,1],["egheFjr}iVHkB@u@Ae@Ke@Ma@",13.2,0],["ajheFhg}iVv@r@",8.2,1],["y`heFhr}iVSOG[As@He@H]",7.1,0],["a`heFdr}iVlBeE",7.0,1],["cnheF~d}iVA[Jg@f@{APo@^s@R_@Hc@Bg@Ee@",12.0,1],["ajheFbw|iVDY@gBBg@Hq@",7.2,1],["_fheF|`}iVVo@T}@Ru@",9.3,1],["scheFjw|iVIk@KcAA{@Dg@",5.6,1],["waheFzi|iV[AUMSSIUIi@",17.7,1],["spheFfo|iV_As@",14.4,1],["upheFxe|iVbBaD",6.1,0],["echeFhw{iViBwA",17.2,1],["ocheFvn{iV`BiD",8.2,0],["gdheFxd{iV_EgD",7.8,1],["{lheFr`|iV`BnA",5.1,0],["u_heFxe}iVrAsC",7.4,1],["aygeFhd}iVoBaB",22.2,0],["w}geFhx}iVbA}B",5.1,1],["_xgeFbe}iV~@p@",13.3,1],["awgeFjg|iVJk@@Y?QCU",7.8,0],["o~geFb|{iVzAnA",12.0,0],["c}geFnx{iVpCaG",7.1,1],["wzgeFj~{iVDg@PYTSV]N[LURCXD",7.6,1],["sxgeFna|iVl@h@H@LG",9.4,1],["ougeFjx{iVAcA?W\\u@",9.4,1],["u`heFrx{iVzDoI",5.5,1],["qxgeFpo{iV_BuA",15.5,1],["q{geFjk{iVhD_H",7.9,0],["gzgeFv}ziVG[DQ~@oD",8.9,1],["mvgeFvl{iV`CyE",6.5,0],["czgeF`j{iV`BrA",10.1,0],["e`heFtxziVJGz@{APMVIVA",7.7,0],["{ygeFbtziVvAyC",5.3,1],["amgeFbrziVjB~A",8.0,1],["_dheFbo~iVtAlA",5.5,1],["a`heFrr~iVvAlA",6.9,1],["{bheFza_jVvAlA",6.1,1],["}zgeF|h_jVvAlA",6.2,1],["ixgeFty~iVxAnA",6.5,1],["sygeFty_jVhA_C",7.1,1],["ayheFxt|iVdAuB",6.7,1],["u~heFru|iV@a@?YAQGMIKOKc@Q",10.4,1],["mjfeFdp`jVlBn@",8.6,0],["kifeF~c`jVrAlA",8.2,0],["uffeFtt_jVvAnA",10.3,0],["imfeFl``jVxAnA",7.3,0],["}efeFzp`jVlByD",7.0,0],["sefeFlg`jVzApA",15.0,0],["safeF~j`jVxApA",13.0,0],["yafeFzi`jVvByE",6.7,0],["{~eeFx{_jVxAlA",21.0,0],["wbfeFfx_jVvAnA",9.3,0],["uefeFhr`jVfBl@",8.7,0],["eafeF~r`jVpAqC",11.5,0],["cafeFnt`jV|AnA",8.7,0],["g}eeFlv`jVnAoC",13.2,0],["w}eeFpn`jVvAnA",11.3,0],["czeeFvp`jV`BgD",12.5,0],["aweeFrt`jVuAmA",7.8,1],["gyeeFry`jV|@kB",13.9,0],["}}eeFfm`jVzAaD",8.6,0],["wzeeFrg`jVNWDSB]DWL[Vu@Re@",13.3,0],["sveeFlk`jVLB`A|@",12.6,0],["eveeFft`jVXm@nAoB",13.3,0],["q{eeF|u_jVtAjA",19.0,0],["ixeeF~o_jV~@v@",25.4,0],["c|eeFpl_jVxAnA",14.3,0],["m|eeFlk_jVz@oB",7.6,1],["_`feFbi_jVvAlA",8.3,0],["uqeeFpc_jVtBmE",10.0,1],["sqeeFpd_jVxBhB",23.0,0],["}neeF~`_jVX?VH^Vj@n@",21.3,0],["oceeFzx~iVKu@ISKGSCi@BUGGM",8.1,1],["sceeFx`_jVfAu@dAi@lA_@dAUlAMh@Ef@Qh@Yl@o@d@m@`AiAb@u@",8.1,1],["mmdeFds~iVB\\X|A",5.9,0],["cmdeFvm_jV|BB",13.1,1],["wqdeFxb_jVLUZIXB",12.4,1],["eodeF`b_jVRPNZDd@Dj@",7.9,1],["imdeFff`jV_@e@Ma@Ig@",9.3,0],["ymdeF|x_jVjBH",8.0,1],["eedeFpy_jVdBH",7.0,1],["iaeeFbp_jVFa@LQl@[",9.8,1],["sheeFpg`jVWCQY_@}@E_ALm@",6.3,1],["eueeFp~_jVj@W|CmA",13.5,0],["qneeFb{_jVHQtAmDLKr@]",20.3,0],["uveeF~u`jVl@j@RDZE",11.2,0],["greeFdo`jVTTNb@HdAJr@",5.3,0],["omeeFb|~iVsAkA",8.0,1],["}`feFp}`jVB\\LFxA@nCs@",9.4,0],["qjfeFpcajVnAcC",9.2,1],["{gfeF~~`jV~@sBa@uBg@e@",7.3,1],["enfeFdeajV~@iG",12.4,1],["yxfeFfbajVfGfB",10.1,0],["qwfeF~|`jVdFrA",6.1,0],["{wfeFd|`jVVeB",5.2,1],["{hheFpb`jVpFv@",7.7,1],["qiheFfh`jVlFv@",6.1,1],["whheFdo`jVfDb@",6.1,1],["_hheF~|_jVnFv@",10.6,1],["_hheF`y_jVHgA",21.7,1],["ciheFva`jVPeC",5.4,0],["}nheFtk`jVh@m@b@Ox@Q",18.4,1],["atheFnb`jV|HdA",12.4,1],["}oheF`k`jViC{B",11.1,0],["suheF~d`jVTc@Da@",9.3,1],["stheFza`jVRsC",11.8,1],["cpheFr}_jVvEp@",8.2,1],["ysheFb|_jVRgC",11.7,1],["asheFrv_jVDg@B}@",10.4,1],["s{heFl``jV}AoA",13.1,1],["o_ieF||_jVaBwA",22.5,1],["m~heF`}_jV|@oB",16.8,1],["g|heF~x_jVhCsF",6.6,1],["{zheFj``jVbAyB",22.1,1],["mxheFb|_jVxCqG",6.8,1],["gaieFfe`jVB]`AuBHGNA",9.3,1],["u}heFrf`jVHa@N]TKd@Dj@CTS",12.7,1],["kvheF~h`jVG_@?]H_@",11.8,1],["exheFhq`jVLOZa@",12.7,1],["mvheFbo`jVVo@F_@QwA",5.6,1],["g}heFdr`jV]BOIGW?MLi@",6.6,1],["}yheFds`jVRANUHS",9.1,1],["gzheFvf`jVQOEQAY",10.3,1],["gbieFtn`jVDWCw@NiB",13.1,0],["ymheFr}`jVoAwA[o@oAiD",16.9,0],["usheFbs`jVv@qB~@qA",9.9,1],["}lheF`x`jVg@{@]cAQw@Au@",16.0,0],["ynheFbcajVUOgBeBY_@q@yAa@u@OQYK",16.3,0],["czheFr}`jVv@cC",8.2,0],["orheFtfajVmF_G",13.5,0],["gkheFns`jVnFr@",8.2,1],["_lheFdy`jVlFt@",7.0,1],["ylheFv~`jVnFt@",5.8,1],["{uheF`jajViAmA",15.1,0],["yxheFxfajVaBgB",13.0,0],["oqheFtfajVvAwA",5.5,1],["yzheF|}`jVa@S]Ie@I",8.6,0],["qaieFjbajVyAyD",14.6,1],["yeieFzz`jV^VfANjAH`@@",16.2,0],["ciieF`}`jVhCzG",10.8,0],["gfieFbhajVxCuC",15.0,0],["g}heFtw`jVfBVh@F",11.4,1],["i~heFjw`jV{@KsCcB",9.7,1],["gkieFt}`jVnCsA",8.0,0],["wgieFjfajVuByF",8.9,1],["alieFh}`jV_AaC",9.2,1],["}kieFlu`jVhDvC",11.5,0],["soieFxq`jVxAlA",10.7,0],["{nieFnw`jVOi@Y_B",7.4,1],["kvieFl}`jVzApA",11.5,0],["krieF|`ajVxApA",17.5,0],["urieFx_ajVzA}C",5.2,0],["cuieFhdajVz@mB",7.0,0],["_tieFplajVrCeG",9.2,0],["cmieFpk`jVdBoD",5.2,0],["amieFnb`jVzArA",11.1,0],["kfieFzv_jVzApA",16.0,0],["ijieFhs_jVxApA",6.4,0],["}pieFb_`jVzAlA",8.0,0],["qwieFxj`jVxAlA",7.2,0],["qsieFfn`jVxArA",6.4,0],["upieF`i`jVxAlA",5.5,0],["sxieFxi`jVsAiA",6.7,1],["kbieFdpajVy@yA",5.9,0],["wdieFnlajVSe@c@iA",5.6,0],["agieFdsajVNItCM",10.4,1],["mhieFxwajVC}@HS",15.0,0],["}fieFpxajV`FW",6.5,1],["qdieF~}ajV~CQ",7.9,1],["acieF|cbjVxBK",10.0,1],["{iieFn~ajVpCO",11.0,0],["mjieF|xajVbBI",10.3,0],["{hieFxwajVc@c@OA",12.8,0],["ikieF~vajVQ?o@k@EYMQ",5.0,0],["_dieFjlajVRQpDuDPY",6.5,0],["k~heFlhbjVE_C",6.4,0],["sdieFhjbjV|BM",11.7,1],["oqieFf_bjVhCB^h@Ff@Bp@J^FHT@",14.1,0],["mtieFxxajVNYDc@DEL@",19.0,0],["mzieFxwajVdEwI",5.8,0],["iyjeFlfbjVY|@",20.8,0],["_}jeF`dbjVMp@",16.8,0],["otkeFfddjVbCK",9.3,0],["kpkeFbldjVRAj@G",12.0,0],["mkkeFfydjVV?lAI",12.8,0],["khkeFh`ejVfAuD",8.5,0],["}jkeFtxdjVdBy@",13.8,0],["wgkeFjxdjV\\}A",12.1,0],["ofkeFttdjVPo@",9.4,0],["sekeFlrdjVd@}A",25.7,0],["edkeFtmdjVGwB",17.9,0],["{fkeF~sdjVSqI",10.7,0],["yckeFrmdjV|@sC",18.3,0],["ickeFf_ejV\\kA",18.0,0],["ackeFz_ejVhBfA",9.7,0],["sgkeFfhdjVCwA",17.5,1],["odkeFphdjVAw@",12.2,1],["oakeFlhdjVF]@a@C[C[",19.9,1],["qakeFpcdjVGeB",13.8,1],["mjkeFfedjVlAG",16.3,0],["mgkeF|ddjVnDO",11.2,0],["{kkeFx`djVtHa@",13.8,0],["aakeF~cdjVd@?L@",22.5,0],["gakeFr_djV~CQ",24.9,0],["{akeFz~cjVGmB",10.8,1],["clkeFzcdjVEwA",18.5,1],["klkeFb`djVCaA",8.8,1],["clkeFr{cjVtHY",11.5,0],["sakeFvzcjVjDO",17.0,0],["utkeFl|cjVhDQ",9.8,0],["qnkeFx{cjVr@C",8.4,0],["olkeF~zcjVC{C",5.5,1],["glkeFnucjVdFY",7.6,0],["qdkeFrtcjVpDO",15.7,0],["qlkeFnocjVfH[",7.7,0],["ibkeFlncjVpAO",22.6,0],["amkeFjicjVdBE",7.8,0],["eikeFbicjV~BK",7.7,0],["kdkeFrhcjVjBG",12.8,0],["k`keFhhcjV~AI",13.0,0],["a|jeFdycjVGcD",10.0,1],["o|jeF`qcjVMmG",12.9,1],["mukeFbxbjVnCgB",20.4,0],["gqkeFxacjVvCkB",15.4,0],["sikeFdhcjVKaF",12.8,0],["ujkeFp_cjV_@AMY",10.6,1],["}lkeFl{bjVn@]",16.6,0],["ejkeF~~bjVDONm@?S",19.4,0],["uikeFp_cjV~@E",19.0,0],["ajkeFrybjVz@g@",28.3,0],["spkeFdtbjVQm@CS",11.4,0],["wpkeFtqbjVtAaC",6.9,0],["imkeF~rbjVv@}A",7.6,0],["mmkeFnmbjVx@z@",6.8,0],["ckkeFdpbjVTt@",10.0,0],["_ekeFnecjVKeE",17.9,0],["gekeFp~bjV?M_@oA",18.7,0],["ydkeF~~bjVhAC",18.2,0],["{`keFhfcjVMqFUw@",16.7,0],["kbkeF`|bjVg@}A",12.1,0],["adkeFrtbjVVkBCGKA",15.1,1],["yakeFd|bjV\\yB",11.4,0],["c}jeFdecjVOiF",25.1,0],["iyjeFvkcjVCqB",25.2,1],["m|jeF|gcjVpAI",22.2,0],["eyjeFjgcjVPM|@oAD[Bq@",14.1,0],["cvjeFl`cjVJwAFEpCL",13.7,1],["avjeFracjV`@C",9.2,0],["_`keFvqbjVr@gE",20.9,1],["y|jeF|qbjVd@wC",22.6,1],["{wjeFvubjVOKmAc@",5.8,0],["q{jeF`tbjVqBo@",10.9,1],["_kkeFdobjVl@iA",14.5,1],["ujkeFxobjVtBT",10.9,0],["}`keFxqbjVYKQ_@",8.8,0],["qdkeFvlbjVb@Bl@N",16.0,1],["gekeFthbjV`ALd@N",7.4,1],["mmkeFllbjVrAcC",22.7,1],["inkeFrlbjVgAQ",11.8,1],["upkeFnkbjVDe@",13.1,0],["mpkeFvibjVFiA",22.3,1],["yqkeFnqbjV_@gB",23.9,1],["gwkeFlpbjV|B_A",11.4,0],["askeFhmbjVcAeE",9.3,0],["wokeFxfbjVtD^",7.9,1],["}}jeFh}bjVK@KI?Q`@gC",9.4,1],["{ujeFfsbjVKGKUKk@IU",8.6,1],["otjeFzsbjVhAZ",6.6,1],["yqjeFzybjV}BIGC]U",9.8,0],["ovjeF~_cjVG{@Ic@",14.2,1],["ukjeF|jcjVEg@Ii@Sy@",6.9,0],["amjeFxecjVC]Co@GQMQQEu@Cc@Ii@A",7.8,0],["}tjeFfecjVCQDuA",6.7,1],["srjeFrecjVj@@tAB",13.4,1],["mpjeF|icjVEg@Ms@A]",8.6,1],["uojeFvicjVbABDC@{ABI",19.5,1],["gojeF`~bjVvCJ",11.8,1],["iqjeFzybjVjBL",9.0,0],["_mjeFpzbjVxAZ",12.0,1],["_jjeFj}bjV?q@",18.8,1],["sijeFx}bjVjBH",21.7,1],["q{jeFdzcjV^CROF]DgAF[Lg@",9.6,0],["mqjeFh`djV?]l@aHC_@QuBE}@IqDEo@E[Q]SQ",6.8,1],["stjeFxecjVT@P@",8.2,0],["{ojeFvddjV]y@KYE_@",5.4,1],["cojeF~ddjVvAF",16.9,1],["{pjeFz`djVrCL",14.6,1],["}~jeFhndjVzDxB",13.1,0],["oxjeFlrdjV|@f@",14.5,1],["czjeF`mdjVqDsBOEe@C",12.3,1],["{`keFlqdjVjEdC",15.3,0],["kwjeF~vdjV^uA",13.9,0],["yyjeF~udjVx@d@",10.9,1],["k|jeF|xdjVoDqB",21.6,1],["oekeFbsdjV~Ax@",9.0,0],["c}jeFn{djVqBkA",21.5,1],["wakeFx|djV`CrA",17.1,0],["m|jeF|{djVfAh@",16.0,1],["{yjeF`}djVTq@",19.6,0],["u{jeFlydjVhAl@",17.5,1],["gujeFtlejVhAuD",5.3,0],["_}jeF~_ejVjCvA",10.3,1],["uyjeFp}djVzF~C",6.7,1],["cujeFp}djVfCxA",15.0,1],["ewjeFxwdjVfFpCLL",13.4,1],["wsjeFtudjVcAq@",7.0,1],["qrjeF~eejVx@sC",9.5,0],["kpjeFh`ejVb@{A",16.0,0],["apjeFhaejVjAl@",6.9,0],["kojeF|gejVt@mC",9.1,0],["sljeFbzdjV[U]S",10.7,1],["_ojeFlxdjVk@[k@Qu@c@",16.6,0],["ujjeFl{djV[SWO",18.5,0],["ynjeFv|djVRY^@zAL",14.1,0],["uhjeF~|djVe@Y",9.8,1],["ajjeFp`ejVw@e@",25.4,1],["cljeFb_ejVkAq@",9.0,1],["ekjeFldejV_Ak@",20.6,1],["chjeFx|djV^sA",9.5,0],["uljeFvudjVnBdA",20.7,1],["aojeF`tdjVn@^",13.7,1],["imjeFdqdjVjFxC",16.9,1],["_ljeF|pdjVtEN",15.9,1],["{kjeF`mdjVvEL",17.0,1],["ukjeF`idjVxEP",15.3,1],["mkjeFhedjVtEN",14.5,1],["esjeFxmejVdAqD",5.7,0],["mpjeF|gejVbB|@",8.3,0],["wljeFviejVv@uC",16.6,0],["oojeFjpejVhAsD",11.6,0],["uljeFdrejVhAyD",11.8,0],["uijeFflejVrBfA",5.5,1],["ojjeFzdejVhAl@",8.2,0],["_ijeFhiejVPo@",10.4,0],["qgjeFvfejVzAx@",10.8,1],["ghjeF~tejVfAoD",6.5,0],["qejeFjnejVz@oC",10.7,0],["ihjeFtaejV`DbB",8.3,1],["kcjeF~hejVh@}A",12.4,0],["uajeFheejV^qA",6.4,0],["i`jeFvaejV`@mA",9.2,0],["{`jeFbbejVcDkB",6.0,0],["ofjeF~ydjVTP|@f@",6.1,1],["cejeFnvdjVhCtA",6.6,1],["qdjeFjudjVbFP",9.3,1],["m}ieFvzdjVBWJkB",7.3,1],["odjeFnqdjVnFT",11.3,1],["idjeFpmdjVrFR",10.8,1],["adjeFvidjVxFT",11.2,1],["}kjeFvddjVB_B",15.7,1],["ikjeFjadjVvER",13.1,1],["kdjeFjedjVB}A",9.5,1],["edjeFnadjVB{A",11.4,1],["akjeFj}cjVtET",8.3,1],["scjeFb~cjVzFP",6.5,1],["wcjeF~adjVfGT",9.2,1],["_djeFxedjVbGR",11.6,1],["adjeFr}cjVF_B",14.5,1],["}jjeFrycjV~BH",10.3,1],["okjeF||cjVF}A",17.3,1],["gkjeFbycjVBaB",5.6,1],["akjeFhucjVDeB",10.0,1],["wjjeFtucjV|CL",14.5,1],["ycjeFtycjVD{A",20.9,1],["qcjeFxucjV@yA",17.3,1],["ojjeFzqcjVtET",15.3,1],["cbjeFhzcjVpBH",6.3,1],["u{ieF`zcjVCSm@oA",10.5,1],["y}ieF~ucjV{@cB",11.2,1],["}|ieFdvcjVPA~@F",11.1,0],["k`jeFzqcjVSi@AO@q@",14.0,1],["gjjeFhmcjVzAB",17.2,1],["{fjeFpmcjVjDJ",9.4,1],["ajjeFxgcjVzGX",14.6,1],["}`jeFlmcjVFgC",12.8,1],["q`jeFbhcjVDeC",19.4,1],["yijeFpbcjVdGT",22.1,1],["ujjeFhlcjVBwB",5.6,1],["yjjeFlqcjV@uB",15.8,1],["sljeFrqcjVX@TN",29.2,1],["wkjeFpycjVa@CKG",24.4,0],["cmjeFrucjVDwB",7.4,1],["}ljeFfqcjVBaB",15.1,1],["mnjeFpqcjVh@@",25.1,1],["wnjeFpucjVl@@",40.9,1],["}ljeF|mcjVCCmAAIEGM",24.6,0],["k`jeFzbcjVH_C",8.8,1],["a`jeFh~bjVJgF",6.6,1],["o_jeFr~bjVlCN",28.0,0],["w_jeFjbcjVlCL",24.8,0],["_`jeFffcjVnCL",22.7,0],["g{ieFbfcjVBwA",13.0,1],["uzieFb_cjVx@F",16.3,0],["}wieFl_cjVh@D",20.4,1],["yzieF~bcjVbAB",23.2,0],["ivieFjfcjVBo@Cc@",17.8,1],["a{ieFtfcjV`BH",18.9,0],["g`jeFdjcjVfFR",16.1,0],["cxieF|jcjVb@@",17.2,1],["o`jeF~mcjVhDP",18.0,0],["syieFrncjVjAF",8.6,1],["yvieFlncjVDyA",10.8,1],["qvieFpjcjVDuA",9.0,0],["i_jeFfrcjVLA~BH",18.3,0],["{yieFprcjVjAF",12.1,1],["svieFzrcjVrBH",10.7,1],["kvieF~ncjVlCJ",14.5,1],["ioieFbscjVBaB",15.0,1],["yvieFvvcjVzET",6.2,1],["awieFtzcjVxER",8.1,1],["wrieFrccjVb@B",24.0,1],["sqieFvccjVvAF",28.1,1],["{qieFrgcjVvAF",36.9,1],["_vieFdgcjV`BH",19.0,1],["evieF`kcjVxEN",19.1,1],["{nieFdkcjVDsBHmD",14.5,1],["enieFxocjVxJ`@",15.3,1],["qiieFdlcjVzBL",13.6,1],["olieFxscjVhJ^",17.1,1],["_oieFlwcjVrBL",6.3,1],["kkieFzwcjVzAD",18.1,1],["eoieFj{cjVlER",13.0,1],["{gieF`|cjVtCN",14.7,1],["ugieFfxcjVfEN",18.1,1],["ahieFtwcjVD{A",7.2,1],["aaieFh|cjVB_B",10.4,1],["g{ieFxidjVpAF",7.0,1],["}zieF~edjVlAB",13.1,1],["}wieFbjdjVzEP",11.2,1],["uwieFffdjVxEP",10.1,1],["owieFjbdjVzEP",11.2,1],["gwieFl~cjVxER",10.2,1],["qzieFbbdjVdAB",12.8,1],["ezieFf~cjV`AD",8.7,1],["cpieFlbdjVBwA",5.6,0],["ypieFfndjVD}A",15.2,1],["q{ieF|mdjVzBH",12.3,1],["{oieFzfdjVfBH",7.3,1],["oiieF~ndjVD_B",12.8,1],["iiieF|jdjVDwA",14.0,1],["_iieFbgdjVD}A",16.8,1],["soieF`cdjVjEP",8.9,1],["moieFd_djVjER",14.6,1],["whieFdcdjVB{A",8.2,1],["qhieFd_djVBsA",6.2,0],["yaieFrkdjVB{A",10.5,1],["saieFtgdjVBwA",9.6,1],["oaieF|cdjVD_B",11.6,1],["iaieF~_djVDyA",15.9,1],["abieFtodjVDcB",13.2,1],["qgieFjdejV^aS",8.0,1],["ykieFr~djVXuM",9.6,1],["gpieF~{djVD}BPsG",12.1,1],["agieFbeejVjBF",16.5,1],["qiieFzdejVn@@",16.1,1],["g}ieFp{djVzBjA",10.3,0],["uxieFn~djVr@`@",9.0,0],["sxieF~zdjVLwB",16.2,1],["cxieFfvdjVJwB",15.9,1],["uwieF|vdjV|AN",5.0,0],["ytieFp|djVLoC",15.2,1],["itieFxvdjVXqF",14.1,1],["itieF`}djVZO\\Cd@?VB",7.0,1],["mbieFtaejVlCLRAJG",16.3,1],["ebieF`|djVdDN",15.9,1],["abieFfxdjVbDN",10.9,1],["g`ieFntdjVpBJ",6.1,1],["m|heFjxdjVB{A",8.2,0],["a|heFxxdjVdAF",10.3,1],["}{heFztdjV~@F",16.6,1],["s{heF|pdjVpAD",18.6,1],["caieFhhdjVxCL",6.4,0],["s{heFxhdjVlBH",21.2,1],["}`ieFlddjVnBD~@F",9.2,0],["_{heF|ddjVf@D\\JTZHVPlAPnAF^L\\",16.0,1],["m|heF|`djVxBH",12.2,1],["s`ieFx|cjVzEP",5.4,1],["ghjeFzuejVx@d@",8.9,0],["wejeFrvejVJUh@kB",9.1,0],["wcjeFvqejVxDkM",9.3,0],["qcjeFjrejVnDnB",17.2,0],["u}ieFdvejV|BnA",11.0,1],["mzieF~{ejV`@sA",8.8,0],["cyieFnxejV\\gA",10.6,0],["{wieFnuejVpCkJ",8.0,0],["q_jeFpaejVp@`@",10.4,0],["i}ieFbcejVnEhC",7.0,0],["sqieFr|ejV@oC",6.5,0],["eqieFrpejVFeD",7.5,0],["ylieFvqejVJaF",7.1,0],["{oieFp|ejVfAk@",5.3,0],["omieFt}ejVFgA",6.1,0],["clieFviejVd@g@Rm@Hc@?U",6.0,1],["wfieFpvejVdAk@",6.9,1],["ccieFhqejVXDPJj@dAb@n@",10.6,1],["ucieFf_fjV`@q@^Wh@U",8.8,1],["u_ieFl}ejVP|@Vj@^d@b@Xd@NZD",5.1,1],["i_ieF`|ejV|CY",8.4,1],["kyheF`{ejVjBS",7.0,1],["m~heFluejV^e@ZWRK",8.1,1],["a{heFvrejVVE^K^QPO",8.5,1],["auheFhzejVdBO",8.0,1],["eyheFncfjVj@@b@D^J",5.1,1],["{theFndfjV`@TP@T?j@[",8.3,1],["cpheFvnfjVe@_@aAuA",11.4,0],["ssheFpjfjV_@uA",7.8,0],["}sheFxjfjVk@YMM",8.2,0],["_pheFlgfjVI]Ms@",5.8,0],["wyheFpsfjVSqE",5.2,0],["sxheFlyfjV`BMb@@h@OVB",7.0,1],["k_ieFxrfjVx@x@L@zAK",8.2,1],["kaieFhmfjVtAmC",8.6,1],["kaieFrtfjV}B{BGIBiA",8.1,0],["g`ieFrzfjVpEa@",8.4,1],["azieFv|ejV|FL",6.4,0],["sejeFrwejVfCvA",6.4,0],["g`jeF`{ejVtAl@tAD",5.3,0],["mljeFbzejVpDdA",6.1,0],["{ojeFxxejVzAb@",5.7,0],["apjeFr}ejVGyB",6.3,1],["{ikeFl|fjVUsK",6.4,1],["ilkeFn|fjVWmK",6.4,1],["igkeF`|fjVYmK",6.0,1],["mrkeFxafjVzBM",11.5,1],["wrjeF~zfjV|BM",8.4,0],["anjeFfufjVzG]",7.7,0],["wdjeFhtfjVjCM",14.4,0],["knjeFxnfjVpGW",6.5,0],["gejeF`nfjVnCK",12.5,0],["wnjeFlhfjVvJg@",8.4,0],["y`jeFfffjVGgD",8.5,1],["sejeFv|ejVxB`@",5.7,0],["}_jeFdsfjVIaD",9.3,1],["smjeFp{fjVbI]",12.2,0],["c_jeFntfjVRMdBm@",9.8,0],["}zieFzqfjVOwG",10.6,1],["g`jeFzffjVRBtBf@",7.4,0],["s`jeFp`fjVlCx@",11.0,0],["m{ieFrgfjVKqC",5.5,1],["{yieF`vfjV[iB",18.6,1],["{vieFpzfjVpAsA",19.0,1],["osieFbwfjVrAuA",20.4,1],["sqieFtrfjV}BcEaAiA",5.9,1],["_{ieFnhfjVh@Lp@\\",5.0,0],["usieFfgfjVbEbH",5.1,0],["gpieFzsfjVtAyA",12.1,1],["yqieFpbgjVxAyA",19.3,1],["mnieFb_gjVxAwA",17.4,1],["_kieFr{fjVrAwA",16.0,1],["ohieFbxfjVeAkB",7.0,0],["qnieFz_gjVtCbF",5.4,1],["slieFnjgjVxAyA",19.6,1],["eiieFbggjVtAwA",11.1,1],["{eieFtcgjVtAwA",17.9,1],["sbieFh`gjV`@_@",16.0,1],["o`ieFlmgjVK_@eDaG",7.0,0],["ogieFjrgjVdCK",16.2,1],["qbieFzqgjVbAE",17.1,1],["icieFvtgjVj@mA",12.8,1],["ihieFligjVbD|F",9.6,1],["}_ieFnrgjVK_C",7.2,0],["}_ieFzmgjVlBGRG",7.1,1],["_~heFfhgjVnAxB",8.3,1],["yxheFpsgjVMc@i@eC",11.4,0],["s|heFtsgjVf@uD",7.9,0],["m_ieFdsgjVhA\\",16.7,1],["s_ieF`zgjVIqE",6.9,0],["syheFz{gjVj@wE",6.6,1],["w{heFrfhjVXmC",5.1,1],["_fieFvbhjVh@l@xAZ",20.2,1],["waieFxjhjV~@N",8.8,1],["wfieF`ahjVpA}C",19.7,1],["wcieF~{gjVrBj@",8.2,1],["uiieFz}gjVh@Mn@[vBuAT?hAT",8.5,1],["ggieFdahjV_@]c@UGIMW",10.1,1],["ahieFnfhjVp@}B",8.5,1],["_nieFn~gjV@Ot@{@",8.0,0],["_qieF`_hjVB_@HUnAsA",8.6,0],["umieFfzgjVpDyD",5.6,1],["ajieF~ngjV|@~A",20.4,1],["asieFl_hjVBkAF_@",13.9,0],["elieFbugjVn@m@",22.3,1],["{nieFhrgjVDS?sBB]Pg@Z]",14.8,1],["opieFr_hjVhAQ",12.1,1],["umieFz~gjVbBY",12.1,1],["cnieF`bhjVdAY",15.2,1],["qhieF|bhjVb@V",18.6,1],["mmieFrdhjVt@WT@VJt@dA",9.7,1],["slieFhhhjVe@_B",7.6,1],["cnieFldhjVIQk@i@MQQw@",11.5,1],["yrieFlbhjVB_A",16.1,1],["moieFpghjVSo@e@q@e@k@",9.4,1],["ipieFxihjVv@Fz@[",15.1,1],["grieFvhhjVi@k@IUa@cCOYc@o@",7.8,1],["kvieFp_hjVfBH",10.8,1],["yyieFf_hjVrAF",18.5,1],["syieFvdhjVs@sBCQ@OXU",11.5,1],["{yieFv~gjVrAwA",11.8,0],["_wieF~hhjV`DR",10.1,1],["{qieFfcgjVpC|E",5.1,1],["wtieFnrgjV~@kALa@Fe@@UEg@g@cB",11.0,1],["otieFzegjVC]Fq@AqABM",12.1,1],["mxieFnfgjVOgE",13.8,1],["g|ieFnigjVp@o@PKj@Q",14.5,0],["gzieFllgjVt@}@HE",11.0,1],["ixieFrggjVN|@",10.7,0],["myieFvqgjVZm@\\]P]Da@A[S_A",10.9,1],["u|ieFhigjV@w@EcA?i@",14.6,1],["ofjeFtagjVzAtA",18.2,0],["omjeFtggjVIeD",7.1,1],["{mjeFpagjVGkD",8.9,1],["imjeF~agjVhEQ",16.2,0],["{ljeF~ggjVpFW",17.2,0],["cmjeFzpgjVIeG",15.8,1],["}qjeFxhgjV~BG",8.5,0],["cljeFjogjVp@o@`Au@l@o@x@oA",6.6,0],["cqjeF`wgjV~AE",7.6,0],["anjeFdvgjVCk@BYXk@",8.2,1],["_vjeFvvgjV`@W\\Cx@EJISwJ",9.1,1],["orjeF|ggjVWkK",7.8,1],["owjeFjhgjVYiK",8.4,1],["svjeFfvgjVYiK",11.9,1],["c{jeFrwgjV`CK",14.7,1],["w{jeFvvgjVUcK",11.0,1],["}{jeFtigjV|BI",18.5,1],["q|jeFzhgjVMkE",10.1,1],["_}jeF~agjVIgD",21.5,1],["a`keF~wgjV|BI",23.6,1],["o`keFfwgjV]cK",17.4,1],["e`keFdjgjVdBK",10.5,1],["oakeFjigjVWmK",18.4,1],["ufkeF~ggjV@QS{H",18.4,1],["}jkeFhkgjVhCO",8.6,0],["efkeFvjgjVfCI",8.4,1],["qekeFtwgjVMqE",5.5,1],["wjkeFtxgjVGwC",15.0,0],["akkeFjsgjVCwB",17.9,1],["aokeFnygjVlBCLD",15.7,0],["qkkeFljgjVWkK",16.5,1],["kkkeFnmgjVAs@",39.1,1],["enkeFhghjVzBK",11.8,0],["}ikeF~ehjVQkH",13.0,1],["ajkeFhzgjVlCzC",12.3,0],["eekeF~}gjVGkC",18.7,0],["wdkeFpehjVG{B",8.3,1],["cikeFzshjVWcK",18.2,1],["omkeF`uhjV`CK",20.1,0],["ohkeFpthjV|BI",12.1,0],["cdkeFlshjVQaK",23.3,1],["cdkeFhfhjVxBI",15.3,0],["mckeFbthjVpBM",8.8,0],["a_keFnrhjVSwJ",19.2,1],["w_keF~dhjVIsD",8.9,1],["c`keFx~gjVG}D",10.1,1],["yyjeFfqhjVGOI{C",9.2,1],["}zjeFjehjVlCA",6.8,1],["uzjeFpahjVQ_FEcA",14.7,1],["}ujeFtdhjVEaD",22.7,1],["evjeFx~gjVIyE",22.0,1],["qujeFf_hjVbAM",17.4,0],["kqjeFn}gjVE{D",29.2,1],["iujeFfehjVvAE",16.0,0],["wqjeFxdhjVl@EpAOZA",11.9,0],["irjeFjchjVH]NQhDqB",13.0,1],["eljeFj{gjVGm@Qu@Sc@",10.4,1],["kjjeFd}gjVR_@N_@hAkFL_@V]|@{@",5.8,0],["kfjeFfehjVg@Ik@C}@L",8.0,1],["qbjeFvehjVD_@KyE",7.4,1],["uajeFrugjV^?j@K",8.5,0],["}bjeFtygjVBYJQBSAk@",14.0,0],["w{ieFbwgjV`@Eh@GZK\\U",6.6,1],["g~ieFd}gjVv@Wp@Qh@GjAI",8.5,1],["kbjeFp}gjVpBG",17.3,1],["ubjeFjghjV|FnC",7.8,1],["stieFdmhjVsAqB",6.8,1],["svieF`phjV`AaA",6.4,1],["qwieFzohjVMg@KUs@k@",8.3,0],["eqieF|qhjVaBOMI",18.5,0],["msieFbuhjVrAwA",9.0,0],["cpieFrnhjVF_A[kA",7.9,1],["gsieFtuhjVdDG",14.6,1],["_mieFluhjVPAv@o@T?z@L",18.2,1],["ygieFvshjVSwBAk@L}AFw@G]",5.7,0],["cpieFb_ijVnFB",16.6,1],["soieF~yhjVbGB",14.7,1],["cgieFfxhjVGMKaB",7.3,0],["{dieFduhjVtA\\",10.4,1],["}eieFt~hjVVsBp@gAh@e@F[",5.3,1],["oeieFn_ijV\\Dt@P",21.0,0],["kpieFh}hjVD}A",5.1,1],["wsieF``ijVTMZIj@C",13.9,1],["aaieF||hjVz@sCJy@^{C",6.1,1],["s|heFdahjVf@J",12.6,0],["cgieFfhijVYd@U|@Gf@",11.9,0],["uiieF`mijVc@CUIyAy@",25.6,0],["{hieFpmijVB^TfARfANx@Dv@Md@W\\e@Pi@Eo@a@",7.3,0],["q|jeF~akjVk@mB",7.5,1],["}gkeFjnjjVI_A",8.3,1],["wgkeFxkjjV^OXSt@}@",17.2,1],["odkeFdhjjVKQGW?_@?eB",15.7,0],["wgkeFtajjVTNVBRC",13.0,1],["ghkeFdajjVO_@CQ?{@DYDU",12.6,0],["chkeFd{ijVf@eB?g@",13.2,0],["_fkeF~uijVb@EZM\\]",9.3,1],["cjkeFdvijVxAC",5.5,0],["obkeFnajjVbAOh@I",7.3,1],["o~jeFj`jjV^]X]N]",11.5,0],["gbkeF|hijVR?TLVVd@r@Tb@P^Hb@Bp@",13.2,1],["s|jeFpqijVZHXJTX^n@Zn@",14.4,1],["}fkeFjuijV@g@Da@Hm@?g@",12.8,0],["iikeF~aijV~@Fn@?dAK",6.5,1],["qikeFfaijVLgA",21.2,1],["yhkeF`|hjVEyE",12.4,1],["gckeFp`ijVYyJ",7.2,1],["sbkeFjaijVb@Y\\[jAwB",9.5,1],["{pjeFzdijV@uA",13.4,0],["aqjeFvaijVWMQUK]",11.3,1],["crjeFxxhjVEk@Qa@Q]",11.0,1],["{wjeFbshjVNJ~@RVHPJ",16.5,0],["gsjeFhthjVzAuC",6.7,0],["oqjeFhyhjVPALOLi@Lm@P_@VUXOZCZBTA",13.6,0],["kpjeFvaijVPEROLSFa@Dk@",5.4,0],["omjeFd|hjV`@iAPe@RMXIV?hBR",9.9,1],["sjjeFrshjVJC`@Y`@Gz@Bx@Dj@IXa@",10.8,1],["ekjeFxjhjVhAIZB",13.8,0],["ifjeFnlhjVh@bARR~@p@",7.8,1],["yejeF|whjVHObBu@NM",13.6,0],["wejeFtxhjVrAPd@A",5.8,1],["g_jeFlnhjVuAmCa@i@",9.7,1],["cxjeFvqhjV|B}Dv@}@",5.3,1],["edjeFr~hjVFRJJT@VE`@ITA`AJ\\AbB[",13.2,1],["cdjeFv}hjVFORO`@K",9.2,0],["gajeFd|hjVlBQ",6.8,1],["mzieFpqhjV@m@G_A?c@",6.5,1],["uyieFv}hjVPaBh@uEJeA?]",5.1,0],["ktieFv`ijV]\\a@J_@Ga@QUUM[CY",14.3,0],["qtieFz_ijVEQC]BaB",7.5,0],["ybjeF`}gjVAuA",6.3,0],["m{heFtdgjVtAI",10.6,1],["{}heFt_gjVrCU",8.1,1],["exheFz~fjVnCSLEHa@",14.0,1],["uwheFddgjVbBM",12.4,1],["yvheFhigjV`AGHE",11.2,1],["cvheFfngjVKw@YoA",7.6,0],["ijieF~pbjVp@Id@K^OTM",5.3,0],["gdieFfnbjVbCkB",6.6,0],["i_ieF`qbjV`A_@",6.2,0],["{|heFjwbjVt@Y",8.5,0],["gtheFbrbjVs@qD",5.0,0],["_yheFnmbjVhAi@",5.1,0],["ksheFtrbjVfAc@",7.4,0],["cvheFjccjVjAa@",14.8,0],["ksheFlacjVuBaK",5.4,1],["gqheFt{bjVa@qB",11.7,1],["ksheFjlcjVjAU",18.2,0],["yoheFfkcjVlAW",6.6,0],["amheFxicjV]iB",7.8,1],["ilheFbjcjVpAW",6.1,0],["kpheF|objVfEsA",6.6,0],["qgheFxmcjVy@yC",7.2,1],["coheF`~cjVYkAOc@",12.4,1],["gpheFxycjV`B]",17.9,0],["clheFlxcjVdB_@",15.0,0],["wlheFxjcjVj@`C",10.3,0],["_lheFl|cjVOeB",11.0,1],["ikheFz|cjVpCq@",9.4,0],["ifheFf{cjVzA_@",6.2,0],["acheFnycjVe@_B",7.0,1],["ijheFf`djVM]OYOc@",5.7,1],["siheFp`djVdCg@",11.8,0],["kiheFlddjVScB",10.7,1],["qaheFn}cjVc@}A",8.4,1],["q`heFfbdjV_Cd@",5.1,1],["_eheFrcdjVyBb@",9.4,1],["sfheFhidjVlF_B",11.7,0],["c}geFpkdjVk@}C",5.8,1],["meheFhldjVg@w@",8.8,1],["ydheFzldjVZDZ?x@O",14.2,0],["w`heFvqdjVDa@A]KmA",11.3,1],["s`heFlldjVV?b@DV?RG",12.1,0],["geheFhmdjVD\\Bb@?ZCj@En@EbA",8.9,0],["e|geFvqdjVDy@Ce@S_A",9.1,1],["kjheFr_ejVtBN",11.3,0],["yeheFf`ejVtFX",13.1,0],["_}geFnvdjVRkB",5.5,1],["efheFn_ejVFwA",5.2,0],["mmgeFlydjVi@{C",9.6,1],["cxgeFdpdjVg@{C",9.6,1],["uygeFbjdjVi@}C",7.7,1],["kwgeFrpdjVlEsA",7.3,1],["cogeFjsdjVg@aD",8.0,1],["upgeFdmdjVe@}C",6.7,1],["grgeFzfdjVe@yC",7.5,1],["cvgeFfidjVpBo@",10.1,1],["cwgeF|bdjVbBg@",9.8,1],["i{geFxcdjVi@{C",6.7,1],["}|geFv}cjVi@wC",9.5,1],["s~geFtwcjVi@_D",6.1,1],["c|geFf~cjVjEwA",5.7,1],["ysgeFx`djVi@{C",7.2,1],["g`heFnqcjVg@}C",5.8,1],["itgeFx~bjVk@yC",8.5,1],["ewgeFpgcjVdCs@",9.0,0],["ougeFtmcjVdCu@",5.4,0],["wrgeF`ecjVg@}C",10.1,1],["wigeFbhcjVe@}C",6.4,1],["ikgeFzacjVg@{C",6.2,1],["{lgeFv{bjVi@yC",6.0,1],["ucgeFx~bjVi@{C",5.0,1],["aggeFlrbjVg@yC",6.2,1],["edgeFtfcjVv@W",6.7,1],["cbgeF`ecjVi@_D",9.4,1],["kageFnecjVjCy@",8.4,1],["qzfeFxacjVi@yC",5.3,1],["yyfeFjbcjVjA_@",9.2,0],["_wfeFdacjVpBm@",21.8,0],["o{feFd|bjVlEwA",19.6,0],["c}feF|ubjV`Bg@",24.8,0],["w~feFzobjVdBk@",24.3,0],["k`geFribjVbAY",12.5,0],["_dgeFbkbjVrAc@",6.6,0],["y}feFphbjVxBs@",23.4,0],["iwfeFbobjVcA{F",17.9,1],["utfeFpxbjVo@kD",17.8,0],["ubgeF`cbjVg@}C",5.7,1],["}ageFlcbjVlEwA",11.8,0],["syfeFffbjVg@_D",16.9,1],["g{feFz_bjVe@{C",14.5,1],["qcgeFf}ajVlEsA",6.7,0],["w|feFvyajVi@{C",9.5,1],["ewfeFzebjVvCcA",6.2,1],["ozfeFh`bjVxAe@",12.5,0],["a|feFdzajVtAc@",7.0,0],["u}feF`tajVjEsA",5.6,0],["usfeFv|ajVi@{C",15.3,1],["arfeF|bbjVi@_D",17.9,1],["eqfeFhfbjVOcA",18.8,1],["crfeFv|ajVtDiA",13.1,0],["qtfeFbwajVpEuA",12.5,0],["gvfeF~pajVnEwA",8.0,0],["iofeFlbbjVjCy@",15.3,0],["wmfeFpsajVi@wC",12.1,1],["elfeFtyajVg@}C",14.0,1],["aifeF`fbjVe@wC",14.5,1],["sjfeFz_bjVe@{C",18.5,1],["uhfeFt_bjVfBe@",14.6,0],["ijfeFpyajVfDcA",16.3,0],["{kfeFlsajVfDcA",9.7,0],["qmfeFhmajVx@UxAU",6.0,0],["iffeFlpajVc@gC",22.8,1],["{zfeFpkajVnBk@",7.5,0],["azfeFtgajVdAZTJ",9.8,0],["wufeFniajVtDgA",7.7,0],["agfeF|ebjVpBo@",17.0,0],["wefeFjmbjVw@uE",11.0,1],["wbfeFjibjVNk@j@oA",6.5,1],["acfeFx|ajVi@}C",23.0,1],["wdfeFpvajVg@yC",21.3,1],["mbfeF`}ajVjA]",9.7,0],["{~eeFt{ajV~Ag@",12.5,1],["q{eeFryajVg@_D",21.4,1],["e}eeFnsajVi@yC",20.4,1],["mefeFhlbjVj@Q",14.0,0],["}zeeF`zajVpEuA",20.7,1],["o|eeF|sajVnEuA",11.8,1],["e~eeFxmajVbBi@",8.7,1],["iweeFdjajVMw@",9.5,1],["uueeFjpajVg@{C",11.0,1],["ateeFpvajVg@{C",6.7,1],["}teeFp|ajVh@gBBUGW",15.6,1],["ezeeF~|ajVLEjBl@",19.9,1],["}weeFdcbjVkDkA",19.2,0],["_}eeFt~ajV`Ag@",15.6,1],["}zeeFfmbjVgFcB",20.0,0],["kyeeFfhbjVkEwA",20.6,0],["axeeFtebjVb@yB",5.7,0],["steeF~gbjVcBk@",6.8,0],["m{eeFdrbjV`@aC",10.6,1],["c|eeFlrbjVwBq@",6.4,0],["y`feF`qbjVcBd@",18.8,0],["}efeF`rbjV{AaJ",9.5,1],["cafeFhpbjVgA_@GKKm@",13.1,0],["}weeFhtbjVeBk@",8.8,0],["{xeeF`zbjV@K^uB",12.3,1],["}jfeFb|bjVrC}@",21.2,0],["ajfeFxacjVa@eC",9.2,1],["gifeFhbcjVjEwA",14.4,0],["ypfeFjecjVnEsA",25.4,0],["}`feFzdcjVg@yC",7.6,1],["sbfeFr~bjVe@uC",5.3,1],["krfeFf_cjVlEsA",23.9,0],["}qfeFxecjVaBf@",25.9,1],["kufeFbgcjVgA\\",10.9,1],["ipfeF~kcjVsA^",25.1,1],["ksfeFdmcjVcBh@",10.7,1],["mwfeFbncjVe@yC",7.8,1],["yufeFftcjVg@{C",8.1,1],["csfeFzscjVlCw@",23.2,0],["gnfeFdqcjVk@uC",10.3,1],["sqfeF|dcjVe@yC",5.4,1],["ilfeFhjcjVpBo@",19.6,0],["wjfeFnpcjVrBq@",15.4,0],["ohfeF|gcjVe@yC",9.2,1],["cffeFpncjVhEsA",10.2,0],["wgfeFjhcjVnEsA",11.8,0],["m_feF~dcjVq@wD",7.4,1],["gafeFb~bjVg@{C",8.3,1],["{bfeF|wbjVg@wC",5.3,1],["{gfeFnebjVg@yC",15.8,1],["oifeFh_bjVg@yC",19.0,1],["ckfeFbyajVc@wC",12.3,1],["slfeF|rajVg@wC",16.2,1],["gweeFvubjVjBj@",7.7,1],["gseeFvvbjVn@kD",12.1,1],["sqeeFzpbjVh@oC",6.9,1],["oseeFnhbjVdBh@",19.1,1],["aoeeFtxbjV`AsF",9.3,1],["soeeFnibjV`@}Bz@}C",8.1,0],["ioeeFhjbjVdBj@",16.5,1],["yneeFhybjVhBn@",15.8,1],["ckeeFblbjVfBj@",10.8,1],["ikeeFzjbjVZeBr@iC",16.8,0],["_geeFvlbjVZgBlAcE|@_D?g@O}@",7.6,0],["qleeFb`bjVr@cC",14.3,0],["mjeeFtzajVH[DY@W",15.6,1],["eheeFfxajVaAeA",6.6,0],["sbeeF`zajVMq@W}@Ge@",17.3,1],["eeeeFtwajVf@O",23.9,1],["skeeFzsajVdEoA",21.8,1],["eeeeFhpajVMaA",17.9,0],["gieeF~kajVfA]",10.9,1],["_~deFrtajVaA`@k@NWB",14.6,0],["w~deFxsajV{@Ka@MSSMUC_@@{@GYaAmFM_@US]S",7.3,0],["sleeFjsajVg@}C",16.0,1],["eneeFdmajVg@{C",10.0,1],["aleeFpgajV[W",7.6,1],["uqeeFfvajVzBq@",8.5,0],["ipeeF`}ajVt@iC",8.2,0],["waeeFb}`jVI_@",10.5,1],["uaeeFt{`jV~DcB",5.6,1],["}zdeFh{`jVG}@?Q",13.9,1],["uzdeFf}`jVCm@",10.7,0],["e~deFpdajVz@uB",10.6,0],["m_eeFreajVeA_A]UqBw@WO",5.8,0],["q}deF~kajVyBwB",11.5,0],["}|deF|oajVkBkBMS]_B",8.5,0],["mrdeFlfajVmF}A",7.6,0],["{wdeFl~`jVjAZ",17.7,1],["cudeFn_ajV~Bn@",6.6,1],["cxdeFfx`jVJL|Bj@",15.5,1],["msdeFfz`jVrBh@",5.2,1],["{wdeFxr`jVhHlB",6.1,1],["crdeF`p`jV\\KV?bBd@",5.5,1],["czdeFtjajVyCsC",9.2,0],["wsdeFtkajVwBm@]A",7.9,0],["ytdeF|oajVZSH]Hy@",5.2,1],["addeF``ajVyCy@",16.4,1],["ofdeFrq`jV`@eC",6.5,1],["kedeFleajV{Bo@",5.2,1],["}ydeFftajV{AAm@I",8.7,0],["sudeF|vajV_@u@W]OE]@",12.5,0],["{{deFb|ajVrA{E",9.4,1],["wvdeF`{ajVd@yA",6.5,1],["erdeFvzajV]_@a@oA",5.8,0],["e{deF~dbjVaB{@",14.9,0],["c_eeFjbbjVi@q@",24.8,0],["gwdeFlgbjV}Ay@",8.3,0],["{hdeFdubjVhCz@",5.7,1],["efdeFv|bjVsCaA",6.2,0],["wqdeF~}bjV}DuA",5.1,0],["cvdeFrubjV~DtA",5.3,1],["ezdeFjsbjVfBh@",5.9,1],["w}deFt`cjVdBl@",16.2,1],["c~deF|_cjVZqBN{@",9.3,1],["mbeeFb~bjVlBgK",5.1,1],["k~deFrqbjVdBh@",5.4,1],["obeeFvobjV`Bj@",6.7,1],["{feeF|mbjVfBh@",8.8,1],["ineeFbgcjVbBqJ",7.7,1],["{meeFp_cjVBHZ@",18.5,1],["koeeFldcjVb@N",19.2,1],["ojeeFd{bjVdBj@",10.7,1],["ijeeFticjVjBkK",11.0,1],["ifeeF~|bjVhBl@",5.8,1],["afeeFlkcjVdAyF",17.5,1],["yceeFbccjVd@}B",6.7,1],["waeeFdmcjVd@iC",11.2,1],["kaeeF|mcjVfBn@",20.8,1],["m}deF|ncjVPcA",6.0,1],["q|deFrkcjVd@kC",5.4,1],["_{deF|ecjVXcB",5.1,1],["wzdeFvfcjVlC|@",7.1,1],["g|deFplcjVvDpA",9.1,1],["{}deFlrcjVxDpA",11.2,1],["yydeFvzcjVsDoA",10.4,0],["_ydeFjzcjVf@qC",6.1,1],["awdeFlucjV|Bt@",5.1,1],["asdeFvjdjV{GyB",6.4,0],["qqdeF~ddjVqE}A",5.9,0],["qxdeFzadjV{@W",7.6,0],["ytdeF||cjVyBu@",8.4,0],["k{deFp`djVwDmA",9.3,0],["cceeFlrcjVb@gC",10.4,1],["geeeFh|cjVfBj@",15.4,1],["wheeF|fdjVl@_D",5.3,1],["_}deFnfdjVuDqA",10.6,0],["u|deFpgdjVWx@_@j@i@`@q@PcAA}@UiAm@m@o@k@aAi@{Ao@{BWgAk@uC[}AW_Aa@{@[c@e@]w@]s@Ks@Ai@F_@H",10.5,0],["s|ceFj~djVgBo@",13.0,0],["g`deFt|djV}@Y",11.4,1],["mgdeF`eejVf@oC",13.0,1],["{edeFn_ejVZeB",6.4,1],["u~ceFlwdjVcCy@",8.8,1],["_gdeFxiejV\\iB",10.5,1],["cddeFvkejVuAe@",10.8,0],["ehdeF|mejVZcB",7.8,1],["}ddeFjtejVo@SOOa@m@",11.3,0],["wddeF`pejVeBm@",12.9,0],["u|ceFj{ejVeC{@",8.6,1],["wgdeFh_fjVIWCSGwCEk@G[Ua@s@q@",9.0,0],["kpeeFhigjVyDkC",6.0,0],["cyeeFtagjVx@{B",9.0,0],["yveeFx|fjVz@}B",12.8,0],["mseeFd`gjVeBmA",9.8,0],["kmeeF~}fjVeBoA",12.0,0],["{peeFf{fjVmBqA",13.3,0],["mteeFxwfjVx@sB",5.5,0],["eleeFdxfjVeAu@",8.5,0],["qneeFhvfjViBsA",18.1,0],["yreeF~rfjVs@g@",11.5,0],["}teeFjqfjV}AgA",13.6,1],["ujeeF`qfjVaDaA",18.0,0],["qpeeFvnfjVcAW",10.3,0],["}weeFzufjVsA_A",8.8,1],["w{eeFlkfjVj@uA",10.3,0],["sseeFjbfjVL_@Lg@Bs@Cs@Mi@i@oAgBoD",9.7,0],["ipeeFflfjVZA\\KfEyBjAs@TY",13.1,1],["meeeFddfjVOu@[q@",17.6,0],["udeeFdefjV\\e@\\k@^y@ZiAf@eChAkGd@yBl@oBnAaHj@_Dd@iA",7.5,1],["yrdeFjpejVYYO]Gi@?g@TcCHeA",14.1,1],["gsdeFbeejVLsA?q@Ci@@o@Dk@",7.3,1],["qndeFdqejVr@wEd@{ETiE",10.8,1],["akdeFx{djVAmB@cA",10.2,1],["whdeFppejV?KHe@",6.4,1],["gxeeFzrejVqAmCk@mA",7.3,0],["_~eeFngejVIw@Ek@AcADaAZ}C",6.9,1],["safeFzhejVHe@Fy@LgEBw@",12.2,1],["myeeF~fdjVNwA?}@I_A",6.7,1],["mzeeF~_djVeAVm@Ju@?{AKa@F{@`@YXu@nAc@n@WPk@P",11.1,1],["mpfeF`qdjV@yA",7.1,1],["gpfeFlmdjVDk@Jc@Z_@^Y",8.1,1],["gvfeFjpdjVzC{@",17.7,0],["uwfeFlwejVkAw@m@W[YKg@?g@Ho@R]h@i@ZK\\IfAM`@U`@]Ve@Ji@Fm@FyBDaE",10.7,1],["ssfeF~xejVgAU",5.7,0],["gffeFnefjVT_APiA^oDHUXWb@I`@@XB",8.5,0],["q|eeFtkfjVyAaA",7.8,0],["oweeF~ifjVcAe@",7.1,1],["iteeFhcijV{@k@",6.1,1],["{gheFfxfjVvBI",9.0,0],["echeFzwfjVxBG",8.7,0],["ohheFjjfjVtBG",11.2,0],["giheFvifjVGsE?eBB}@",5.4,1],["mdheFlifjVMgH",6.5,1],["aeheFl|ejVEk@Ic@MSUQQEWE",10.1,1],["q`heF`zejVIe@Qk@]o@m@g@]Si@Mu@A",12.9,1],["}cheF`jfjVtBI",9.1,0],["i_heFtifjVxBI",17.4,0],["siheFznejVZAbAF~@Hf@Ln@Zt@l@XZ",13.1,0],["__heF~qejVEgC",6.7,0],["mjheFhnejVc@uB",6.5,0],["ekheF|iejVxBBdAFh@H|@VjAn@",12.0,0],["g_heFjlejVEoB",8.0,0],["}kheFjiejVIk@GcA",7.4,0],["slheFndejVE_A?y@BQJMNER?",11.5,0],["a`heF`gejVUQWI}DYuCC",11.6,1],["s{geFntejVtBm@",15.1,0],["}{geFxmejVlA_@",16.4,0],["i|geFdgejVh@O",13.2,0],["g{geFd{ejVxAa@",18.9,0],["qwgeFtyejVl@Q",20.1,0],["ovgeFtvejVWeB",5.9,1],["wqgeFhlfjV}G}E",13.0,1],["mqgeF~efjVqHiF",15.8,1],["wngeFhafjV}G}E",19.9,1],["wrgeFvwejV}@ZQBICOs@",21.5,1],["gtgeFdqfjVwDgC",12.0,1],["gsgeFvpfjVv@kB",14.9,0],["wpgeFtkfjVr@kB",14.6,0],["sngeFhgfjVz@_C",22.3,0],["ujgeFr}ejV}@s@",18.5,1],["qmgeFh{ejVcCiB",20.2,1],["uqgeFfwejV~Ae@",7.4,0],["ongeF`uejVe@yC",8.4,1],["ipgeFxoejVoEvA",17.5,1],["amgeF|zejVc@oC",18.8,1],["mxgeFllejVnEwA",9.5,0],["azgeFffejVnEwA",5.2,0],["gsgeFpbejVg@uC",6.9,1],["uqgeFvhejVe@qC",8.5,1],["_pgeF|nejVg@}C",12.9,1],["_qgeFfiejVrEsA",8.7,0],["ejgeFveejVg@wC",16.3,1],["ykgeFp_ejVi@yC",14.2,1],["wmgeFtuejVlBm@",11.6,0],["kogeFloejVnEuA",9.3,0],["ohgeFzkejVi@}C",14.1,1],["}fgeF`rejVi@}C",6.9,1],["sbgeFbqejVzAg@",7.9,0],["iegeFhxejVi@_D",12.9,1],["{ggeFhlejVdA[",8.7,0],["oigeFhfejV~Ag@",7.7,0],["kegeFndejVnA_@",8.1,1],["o_geF`oejVg@aD",14.4,1],["cageFvhejVe@wC",12.6,1],["sbgeFvbejVi@cD",14.5,1],["gdgeFh|djVi@yC",12.3,1],["_bgeFdcejVpE{AFG?Og@}C",11.4,1],["ocgeFz|djVlEwA",10.2,1],["qcgeF`vdjVxC{@",7.0,1],["w|feFfydjVi@wC",6.2,1],["sufeFpudjVa@gC",10.2,1],["s}feFtsdjVpAe@",6.5,1],["y~feFjqdjVSgA",6.5,1],["_wfeF~odjVe@yC",6.9,1],["wwfeFhjdjVpAa@",6.7,0],["ytfeF`idjVd@O",12.4,0],["{`geFfgdjVhCw@",8.0,1],["w`geFridjVs@}D",6.4,1],["oxfeF~idjVe@_D",5.8,1],["ecgeFt`djVo@yC",6.1,1],["wggeFppcjVu@cF",6.0,1],["yjgeFbkdjVA[uAsI",5.4,1],["i|feFj{ejVAUg@eC",13.4,1],["k~feFlsejVYeB",8.2,1],["edgeF|{ejVOg@Ki@",14.5,1],["kfgeFzafjVUk@WWcAq@",11.2,1],["q`geFtdfjVa@iBUs@",12.2,0],["kbgeFhifjVv@{B",14.9,0],["mfgeF~ffjVLQRc@@WE[Qc@",14.4,0],["{fgeFbgfjVOAmBuA",15.6,1],["qjgeFfkfjV_C_B",8.9,1],["_hgeFtsfjV{GuE",6.2,1],["{dgeFlnfjVz@wB",10.5,0],["gggeFjsfjVx@uB",8.6,0],["qigeFhxfjVv@{B",19.8,0],["exgeF~zfjVz@{B",15.1,0],["}ogeFltfjVgBoA",10.4,1],["yugeF~ufjVz@{B",16.8,0],["qvgeFbvfjVkBkA",9.8,1],["irgeFd`gjV{DmC",5.8,1],["kngeFhbgjVz@}B",13.9,0],["}kgeFd}fjVz@wB",12.5,0],["_pgeFxggjVx@yB",13.7,0],["u~geFf~fjVG_E",5.3,0],["q~geFrwfjVpBI",9.5,0],["kzgeFryfjVEaD",7.0,0],["otgeF|pgjVr@aB",5.2,0],["ymgeFnjgjVaAs@",11.6,1],["wkgeFjxgjVv@uB",5.8,0],["migeFpsgjVx@wB",6.6,0],["_ggeFpngjVx@uB",7.9,0],["qdgeFrigjVv@wB",6.1,0],["qfgeFhbgjVoBsA",7.7,0],["gbgeFrdgjVz@yB",8.8,0],["w_geFr_gjVx@yB",8.9,0],["g~feFxzfjVyGoE",6.4,0],["c|feF|ufjVgAu@",9.7,0],["k`geFzrfjVqA}@",9.3,0],["k}feFtzfjVr@qB",14.4,0],["_{feFpufjVv@{B",17.5,0],["qyfeF|pfjVaCaB",10.0,0],["uxfeFvpfjVx@wB",10.9,0],["ewfeFdlfjVcCcB",17.4,0],["c|feFnhfjVkAy@",10.1,1],["uvfeF|efjVgCeB",8.1,0],["ivfeFvkfjVx@wB",10.5,0],["atfeF~ffjVZy@",11.5,0],["qhfeFlifjVgEwC",6.6,0],["cofeFldfjVoA}@",20.2,0],["}gfeFhifjV^_A",9.4,0],["gjfeF`nfjVx@uB",7.0,0],["akfeFjnfjVwCsB",7.1,0],["kpfeFljfjVqBuA",15.5,0],["mmfeFjsfjViCgB",6.2,0],["irfeFvofjV}B}A",13.0,0],["_ofeF`xfjV|@{B",7.0,0],["yofeFhxfjVyCsB",8.2,0],["_ufeFjtfjVuByA",9.0,0],["avfeF`ggjVx@{B",6.8,0],["ssfeFzagjVv@sB",7.0,0],["gqfeF||fjVv@{B",5.4,0],["kxfeF|kgjVt@wB",6.1,0],["yzfeF|pgjVv@yB",8.1,0],["e}feFzugjVv@sB",5.5,0],["u_geFxzgjVv@qB",6.7,0],["_bgeFt_hjVt@qB",8.4,0],["exfeF`ghjVr@iB",8.8,0],["}ufeFjbhjVx@yB",7.3,0],["ynfeFhsgjVx@wB",6.3,0],["olfeFlngjVv@yB",7.8,0],["sgfeFddgjVv@sB",7.7,0],["{bfeFhzfjVx@{B",6.0,0],["wdfeFhlfjV}AeA",6.3,0],["o`feFhufjVz@yB",5.3,0],["o{eeFtfgjVx@yB",8.4,0],["}}eeFtkgjVz@wB",5.5,0],["mgfeFz_hjVx@{B",7.5,0],["{ifeFxdhjVz@{B",7.3,0],["enfeFxmhjVj@yA",9.0,0],["ydfeFxuhjVv@oB",17.9,0],["obfeFbqhjVx@{B",18.2,0],["}`feFjlhjV{GsE",8.0,1],["e`feF`lhjVz@{B",23.7,0],["q~eeFjghjVgBmA",19.7,1],["ebfeFrdhjVcD{B",11.5,1],["c}eeFrahjV{F}D",14.7,1],["y}eeFdghjVZ{@",9.2,0],["u~eeFtygjV}BaB",22.4,1],["k{eeF`bhjVv@uB",15.0,1],["wyeeFj}gjViAu@",14.7,0],["w|eeFhtgjVoBsA",10.9,1],["sveeFbxgjVx@{B",6.4,1],["cpeeFvdhjVyGwE",5.2,0],["sreeFtihjVgCgB",7.7,0],["kweeF~ehjV}BaB",8.0,0],["sqeeFlihjVv@uB",7.8,1],["myeeFhkhjViCmB",10.3,0],["mveeFnshjVx@{B",9.8,0],["s}eeFdohjVsA_A",5.8,0],["{xeeFpxhjVx@}B",11.0,0],["c{eeFb}hjVt@kB",15.8,0],["gweeFvzhjVs@g@",11.8,1],["yseeFj}hjVaBmA",11.5,0],["opeeFzxhjV{B}A",14.7,0],["qneeFpshjVoDgC",12.3,0],["qleeFfnhjV_D{B",12.8,0],["sjeeFxhhjVsCmB",5.9,0],["o_deFdagjVCqA",16.2,0],["c`deF|}fjV{AC",6.8,0],["gedeFt~fjV\\UJKLa@Pm@D[",9.0,0],["sadeF|wfjVRSRITE\\?^FZN",13.2,0],["o`deFlvfjVAa@AYGWKS",8.1,1],["a_deF`~fjVpAH",10.9,0],["ikdeF|bgjVzCkB",10.2,0],["_ldeF`jgjVQQGSCWB]XsB",7.9,0],["{cdeFbdgjV^YTI`Aa@",6.6,0],["gjdeFpjgjVXe@b@w@",6.0,0],["m|ceFfdgjVOa@UWUM",13.0,1],["_`deF~lgjVEw@FkALwAL_A?W",5.6,1],["o}ceFxugjVY}@]w@",10.6,1],["uadeF|mgjV}BaD",6.2,1],["mddeFnqgjVtAyA",8.3,0],["s{ceFzzgjVs@kC",5.7,1],["__deFv}gjVbBm@",12.6,0],["w_deFf}gjVq@oC",8.4,1],["icdeFr_hjVjBm@",8.9,0],["ibdeF`ghjVSgBUcB",8.8,1],["yedeFtkhjVv@m@h@m@",6.2,0],["qgdeFnahjVhBo@",6.8,0],["wkdeFdchjVdBi@",6.3,0],["_ldeFrxgjVk@y@y@{@}@o@",6.1,1],["qhdeF|tgjVs@eAaA_AkAaA",5.0,1],["cpdeFx`gjVReARw@",7.4,1],["}qdeFtrgjV_Am@",6.5,1],["gudeFhpgjV{@g@",5.1,1],["etdeFtwgjV{AgA",5.3,1],["}wdeFbahjVt@sB",5.3,0],["}odeF|dhjVbBk@",5.5,0],["szdeFpihjVnDkA",6.5,0],["etdeFxfhjVdBk@",5.5,0],["}udeF|phjVsDaC",6.0,1],["_rdeFtshjVgBgA",6.4,1],["ssdeF~thjVmEvA",6.6,1],["mxdeFd~hjVlEuA",9.3,0],["uqdeFpzhjVi@_D",6.1,1],["}pdeF~zhjVzBq@",8.0,0],["gmdeFbwhjVcC}A",7.7,1],["qldeFdxhjV\\If@SZ]\\m@",7.4,0],["wjdeFdnhjVlBm@",12.3,0],["agdeFbwhjVEsC",12.6,1],["{fdeFz{hjVE_C",6.6,1],["qfdeF`zhjVj@i@p@gA",8.8,0],["mcdeF|uhjVLm@D_AFs@Tq@Ra@JS?[Km@YuA",6.4,1],["mcdeFb~hjVTm@b@s@Ta@",11.1,0],["_}ceFvnhjVAq@Am@Ha@LW",7.1,1],["eddeFj~hjV]SSE[D]J",9.4,1],["sfdeFhkhjVCqAGmAMiA",6.4,1],["y_deFl`ijVVw@Ta@Va@Ti@Nc@",11.6,0],["_|ceF~cijVwBqA",7.9,1],["q`deFx`ijVwA}@",10.6,1],["kfdeF~cijVY_B",9.3,0],["mddeFniijVrAeA",8.4,0],["}_deFviijVYoA",11.5,1],["yadeFjqijVzEsB",12.2,0],["sedeFnsijVxAo@",9.2,0],["mideFpuijV|As@",9.0,0],["_ldeFhnijVfA]",7.8,0],["ygdeFnlijVvAc@",6.3,0],["akdeFtfijVhCw@",5.4,1],["wmdeFzgijVjA_@",14.8,0],["uedeFndijVdA_@",7.2,0],["indeFhgijVg@}C",7.8,1],["}udeFvgijVz@W",8.7,0],["ssdeFxfijV~Ag@",5.9,0],["gpdeFheijV\\K",8.5,0],["uvdeFrdijVlEuA",10.4,0],["}odeF~`ijVk@cD",9.0,1],["gtdeF~_ijVbBo@",7.3,0],["godeFlaijV~Ai@",15.6,0],["ukdeF|_ijVhBk@",5.8,0],["qldeFvmijVY_B",13.8,0],["cudeFzjijVrBk@",9.4,0],["_qdeFdiijVnA_@",11.2,0],["urdeFjuijV[iB",6.0,0],["ivdeFrgijVQkA",16.3,1],["gwdeF`dijVa@}BOg@",6.8,1],["u~deF~gijVhF_B",6.6,0],["}|deFbnijV`Cu@",6.1,0],["qxdeFhlijVxAc@",15.3,0],["k{deFhtijVjBk@",5.2,0],["mwdeFtrijVhBm@",15.3,0],["k~deFruijVdA]",13.1,0],["wbeeFtpijVvCaA",8.3,0],["kgeeFxkijVVKhA_@",8.9,0],["kieeF`~hjV`BbA",6.6,0],["wqeeF`~hjVp@cC",5.1,0],["awdeFd}ijVrDmA",6.3,0],["yzdeFfyijV|FiB",10.2,0],["kqdeFzyijVa@sB",6.5,0],["ypdeFjzijVnAeAxBcA",7.0,0],["qldeFfgjjVtEqB",6.0,0],["gbdeFpjjjVjBy@",7.3,0],["}ddeFbcjjVxEuB",10.2,0],["}gdeFvtjjVtEqB",6.5,0],["acdeFjbkjVrEsB",5.9,0],["c`deFrpjjVbCeA",7.2,0],["uydeFhkjjVlA_B",5.3,0],["oceeFhgjjV|AsB",7.0,0],["ybeeFn_jjVlAcB",5.8,0],["w_eeFr{ijVhA}A",5.5,0],["o`eeFp{ijVg@s@",10.0,0],["oceeFtwijV{@gA",7.1,1],["w`eeF|jjjVzDgF",5.3,0],["m~deFvnjjVgAyA",6.3,1],["u}deFb_jjV_AqA",7.7,1],["_jeeFlhjjVt@cA",9.5,0],["goeeFz`jjV`AoA",8.1,0],["cqeeFfcjjVf@q@",7.6,0],["cpeeFz`jjVwAsB",7.0,0],["axeeF~}ijVfBcC",13.3,0],["cyeeFxxijVxB{C",5.1,0],["_zeeFpgjjVFQ`B{B",13.4,1],["{}eeFnwijVtDcF",7.2,0],["_{eeFlrijV{@mA",6.3,0],["c}eeFduijVqAkB",5.5,0],["kbfeFjpijVZ[~@mA",10.6,0],["ycfeFfiijVfAiA",14.0,0],["qefeF`eijVCc@DQNYFGRT`@h@",9.0,0],["cedeF`wkjVsDeF",6.0,1],["{adeFbskjVwDeF",6.0,1],["qgdeF~jkjVfA}A",11.8,0],["qndeFxlkjVnBoC",8.1,0],["ijdeFjgkjVlA_B",5.9,0],["yrdeF|jkjV`C_D",9.2,0],["}}deFxwjjVfAwA",7.1,0],["sfeeFhrjjVjA{A",13.4,0],["mieeFxnjjVl@{@DMCSKO",7.2,0],["ijeeF|vjjVv@gA",7.9,1],["mreeFtrjjVF?vAmB",18.2,1],["gveeFpijjVLOd@k@",12.3,1],["czeeFdsjjVfBgG",13.8,1],["w}eeFfqjjVjBqG",9.0,1],["iveeFzsjjVxA{E",15.0,1],["q}eeFjejjVJ]hBeC",10.8,1],["iafeF|njjVfBkG",8.5,1],["qafeFxbjjVvBuC",6.8,1],["gefeFn`jjVpBkC",7.3,1],["_lfeF|pjjVhAcE",5.9,1],["gifeFpijjVTu@~@cDNa@",9.6,1],["ejfeFxbjjVb@cB",5.0,1],["qhfeFf~ijVRm@Za@r@}@",8.8,1],["skfeFp|ijV|@{C",8.4,1],["ynfeFxdjjVrA{E",5.1,1],["urfeFbxijVh@oB",6.4,1],["w{feF|vhjVKcD",6.4,0],["kxfeFptijVM}B",5.6,1],["udgeFlshjVHq@Hg@Lk@",9.8,0],["oigeF~fhjVxBcG",6.1,0],["sngeF~fhjVfD{I",5.9,0],["kqgeFplhjVx@yB",8.8,0],["swgeFv`hjVlDcJ",5.7,0],["wzgeF~ehjVNQt@{A",8.5,0],["e{geFr}gjVbAiC",5.8,0],["wxgeFrxgjVbBoE",6.1,0],["m~geFvbhjV\\[h@mA",5.4,0],["kbheFj_hjVnAgB",7.7,0],["s~geFnzgjVvDcK",6.0,0],["saheFlvgjVjAaD",5.6,0],["y~geFhpgjVv@qB\\o@",7.3,0],["gaheFtkgjVdAkB",7.5,0],["ceheFpggjV|@gB",11.7,0],["abheFrkgjVS]oAoA",7.2,1],["aiheF||fjV{@{@",10.0,1],["ilheF`vgjVYcBBOnAc@",7.1,1],["wkheFnwgjV|Ag@",13.8,1],["siheFjahjVVY`BwA",14.3,1],["ogheFhehjVbBoB",12.4,1],["_kheFr|gjVNI~@Mj@Q",11.4,1],["yeheFrjhjV`CsC",13.5,1],["mdheFlphjVjDeE",9.7,1],["ibheFpvhjVjDkENM",5.4,1],["uwgeF`dijVvBgFv@cB",5.1,1],["eddeFn`ljVcB{B",6.0,1],["w_deFdrljVj@_A",7.0,0],["eadeFxdmjVqA{A",12.1,1],["kddeF|hmjV?kE",6.5,1],["{ddeF|amjVcAAMCMO",8.8,1],["{}ceFlhmjVoAuA",16.8,1],["cfdeF~mmjVn@?",21.7,0],["qedeFfymjV\\A",18.5,0],["{cdeFlzmjVXa@",24.3,0],["qbdeFfymjVb@?",26.6,0],["sbdeFvxmjVbBqC",18.8,0],["i}ceFp|mjV{@M_@K",8.0,1],["scdeFf_njVSo@A_C",6.1,0],["o|ceF`bnjV_AIy@MiAU",8.8,1],["ucdeFxqmjVlAkB",17.5,0],["{`heFn{njV^w@RQZQv@G",6.7,0],["c|geFpwnjVQ_A[aASi@",7.0,0],["s|geFxeojV@yBFo@JU",5.8,0],["s{geFj~njVFi@AaAG{@",5.6,0],["oogeFrfojV?mA",7.7,0],["oogeFbcojVE[_@{@Yk@",7.7,0],["sqgeFv}njV@yAFy@",8.2,0],["_pgeFzwnjVx@Cd@E",12.0,1],["ungeFvcojVhCD",9.3,1],["}kgeFdwnjV\\Ob@[NO",10.1,1],["uigeF|cojVlDF",7.6,1],["gcgeF~qnjV_AkD",5.3,0],["{`geFnrnjVlBwC",6.7,0],["sageFjdojVxCF",6.1,0],["c|feF|cojVLw@Vq@v@oA",6.3,0],["{igeFvxmjVVJ\\?x@G",8.8,1],["i{feFn_mjVhIA",5.0,0],["iwfeFdlmjVlE?",6.0,0],["cxfeFj{mjVp@d@~@x@",8.3,0],["atfeFv~mjVXPz@\\j@J",6.5,0],["{xfeFxanjV~@p@n@b@",8.4,0],["ytfeFzdnjVj@Zr@Vz@P",5.0,0],["gofeFjfojVAuC",6.6,0],["wbfeFdfojV?eC",8.5,0],["wbfeFp`ojVAgC",9.1,0],["ybfeF~znjVAoC",9.1,0],["{bfeFhunjVAiC",9.1,0],["uweeF`fojVAkC",16.4,0],["yweeFp`ojV?mC",16.6,0],["yweeF|znjVAoC",17.1,0],["{weeF`unjV?kC",19.5,0],["yweeFronjVAkC",13.7,0],["kbfeFjpnjV~HA",15.6,0],["obfeFtjnjVbIA",19.1,0],["obfeFbenjVbI?",19.4,0],["mbfeF|unjVbIA",12.0,0],["ibfeFr{njV`IE",8.8,0],["ebfeFfaojV~HE",6.3,0],["effeFfaojVzA?",5.4,0],["qhfeFt{njVfDA",7.6,0],["{hfeFbvnjVnDC",10.0,0],["gjfeFlpnjVxEA",10.9,0],["mjfeFxjnjV|EA",10.7,0],["{nfeFxjnjV|B?",5.5,0],["gifeFbenjVtD?",12.1,0],["}nfeFfenjVhDA",6.0,0],["obfeFn_njVbIC",19.1,0],["obfeFzymjV`IC",16.4,0],["ycfeFdtmjVfIA",17.2,0],["odfeFrnmjVhI?",24.7,0],["sdfeF`lmjV`FC",25.3,0],["sdfeFtemjVtF?",21.1,0],["o|eeFtemjVbA?",8.5,0],["}yeeFnkmjV?aD",17.9,1],["aofeFvnmjVnHC",13.4,0],["cofeFblmjVpH?",12.8,0],["_ofeFjtmjVdIA",14.8,0],["}nfeF`zmjVhJC",11.7,0],["}nfeFt_njVlJE",9.4,0],["}ofeFvemjV~D@",6.9,0],["oifeFvemjVzBA",15.1,0],["ecfeFhymjVEw@YuA",6.9,0],["acfeF|~mjV?mC",7.7,0],["_xeeF`ymjVAgC",10.2,0],["axeeFnsmjV?eC",14.7,0],["_pfeFj_mjVhI?",7.2,0],["}ofeF~xljVfI?",5.7,0],["_pfeFtrljVjIA",5.7,0],["_pfeFflljVhI?",5.6,0],["_pfeF|eljVfI?",5.8,0],["sdfeF|eljVdIC",11.6,0],["sdfeFflljVfI?",13.2,0],["sdfeFrrljVfIC",13.7,0],["udfeF|xljVjI?",14.1,0],["udfeFh_mjVhI@",16.4,0],["_zeeF~dmjV@yC",9.1,1],["_zeeFz}ljV?oB",8.0,1],["apfeFn_ljVhI?",5.9,0],["apfeFbykjVhI?",6.7,0],["apfeFzrkjVhI?",9.6,0],["gefeFhxkjV?{C",7.4,0],["wdfeFbykjVhD?",8.7,0],["{~eeFbykjVlC@",16.5,0],["sdfeFn_ljV`I?",12.8,0],["udfeF|rkjV~AA",9.0,0],["eafeFzrkjVjA?",22.1,0],["ydfeFxokjVtBl@",11.9,0],["qlfeFvlkjVp@ArA`A",14.3,0],["kkfeFxikjVzBpA",12.9,0],["offeF~lkjVh@X",13.1,1],["okfeFbikjVf@gB",13.7,1],["qifeFrekjV~D|B",6.3,0],["sdfeFpmkjVh@eB",8.3,1],["ybfeFfikjVn@}B",5.3,1],["irfeF`lkjV?kC",6.4,0],["uqfeFvlkjVpC?",10.0,0],["onfeFnbkjVzBnA",8.8,0],["yqfeFv_kjVt@cC",6.5,1],["wofeFnzjjVr@_C",8.3,1],["yifeFxdkjVp@aC",14.5,1],["wgfeFp_kjVp@_C",7.3,1],["wefeFhzjjVf@wA",6.0,1],["mefeFj{jjV~DvB",12.7,0],["ogfeFl`kjV`EzB",11.4,0],["{wfeFpkkjVDaA@wJ",5.5,1],["wvfeFj}jjV~BjA",7.1,0],["qwfeFh|jjVAsF",7.9,1],["etfeFpekjVz@oC",12.1,1],["svfeFrjkjVV[`@wA",7.5,0],["k}eeF`zjjVkCyA_@E",12.5,1],["u~eeFz~jjVp@}B",8.1,1],["q|eeFxyjjVJ[R[",10.9,1],["k|eeFrzjjVpBbA",13.0,0],["o~eeFx_kjVhB~@HZ",20.9,0],["sveeFrgkjVyBcBKQ",9.5,0],["mteeFrbkjVgCqB",10.5,0],["o`feF|dkjVjAp@h@VPl@",19.6,0],["}{eeFxikjVPPz@p@",16.3,1],["s}eeFfmkjV{CcB",17.4,1],["gueeFpokjViA}@",6.7,1],["wxeeF|wkjVn@{A",12.1,1],["yveeFdtkjVx@sB",17.2,1],["kteeFpokjV~@uB",14.0,1],["wqeeFxjkjVx@qB",7.9,1],["koeeFdfkjVz@oB",9.1,1],["ieeeFnskjV@qBCQKOkHyF",8.5,1],["kheeFlskjVuBaB",21.1,1],["oleeF`pkjVaDgC",9.0,1],["ameeFhvkjVaF}D",15.9,1],["wqeeF`ykjVyCcC",14.2,1],["iveeF~{kjV]W",17.4,1],["_ueeFn{kjVbAe@",13.2,1],["ooeeFfxkjVbAe@",6.1,1],["qyeeFveljVt@?",11.0,0],["gueeF|dljVCuF",14.7,0],["_peeF~dljV@eHE]",13.2,0],["sjeeFzdljVCuM",11.9,0],["ioeeFreljVhCA",10.9,1],["ajeeFpeljVdC?",12.0,1],["eeeeF|ykjVCsD",13.2,0],["eeeeFfbljVAoF",5.6,0],["yoeeFllljVCeE",8.8,0],["oyeeFjxljVl@?",11.8,0],["kweeFjxljVv@A",11.8,1],["steeFl_mjVjCA",10.4,1],["qteeFhxljVhCE",15.6,1],["ioeeFdxljVlCC",11.2,1],["}ieeF`xljVfC?",5.4,1],["sweeFpnmjVhAA",15.4,1],["{teeFzmmjVEyL",11.6,1],["qoeeFxmmjVC{L",6.1,1],["oteeFlnmjVjC?",24.0,1],["coeeFlnmjVfC?",19.6,1],["{ieeFlnmjVjCC",15.3,1],["qweeFbtmjVfIC",14.9,1],["_weeFvymjVtHC",13.4,1],["wveeFh_njVnHA",12.3,1],["kleeF~smjVhIC",14.1,1],["kleeFrymjVjIA",12.6,1],["ileeFf_njVjIG",13.7,1],["gleeFzdnjVdIE",17.3,1],["eleeFljnjVhIA",20.0,1],["qdeeFhnmjVnAB",9.7,1],["uleeFponjVAmC",15.7,0],["mweeFhpnjVfAC",5.3,0],["kteeFfpnjV`FC",11.2,1],["gleeFdpnjVlIG",16.8,1],["oweeF`enjV\\?",9.7,0],["uleeFjdnjVAmC",6.1,1],["wleeFfwmjVCuA",5.1,0],["eaeeFjonjVAoC",6.3,0],["gaeeF`unjV@qC",5.9,0],["eaeeFhznjVAcC",5.9,0],["aleeFl{njVxC?",12.1,1],["cleeFvunjVnFC",14.4,1],["cdeeFrunjVhAA",7.5,1],["qleeFtznjVAiC",16.4,0],["sleeF`unjV?kC",16.9,0],["{reeFxunjVvDA",10.7,1],["iseeFl{njVfE?",8.8,1],["yteeF~`ojVvF?",7.0,1],["sfeeFj{njVdCA",5.6,1],["_leeF~`ojV|A?",10.7,1],["qleeFl`ojV?mC",12.9,0],["oleeFvdojVAeB",12.2,0],["cbeeFrdojVTKFWCoB",7.3,0],["c~deFhxnjVZAvB?",12.5,1],["q`eeFpunjVlC?NA^Y",5.7,1],["o`eeF|onjVrF?",6.4,1],["o`eeFjjnjVtHC",11.7,1],["q`eeFvdnjVtFA",12.0,1],["y`eeF`_njVxFA",11.0,1],["u`eeFlymjVxF?",11.8,1],["y`eeFzsmjVdIC",8.4,1],["gvdeFbsmjVAiC",5.0,0],["e_eeFdnmjVhCA",6.3,1],["oydeFbnmjVxA@",6.9,1],["ydeeFpeljVjCC",6.7,1],["codeFfinjVdC{B",7.9,0],["kpdeFpdnjVvC?",6.6,0],["spdeFz~mjV~C?",8.5,0],["cndeFtsmjVlAA",5.6,0],["wtdeFfjnjVtB?",9.8,0],["crdeFxrnjVxA?",5.3,0],["ujdeFr~njV@{B",6.3,0],["g~ceFj~njV@}D",6.1,0],["wbfeFljojV?aB",7.1,0],["stgeFjfojV?{AEKOA",5.9,0],["ungeFdgojVnJR",5.8,1],["_`geFfmkjVi@{@m@]eA]}@K",5.9,0],["}ngeF`lkjVXg@\\Wf@O^Gd@E",6.7,0],["iygeF|_kjV?yE",5.4,0],["gygeFbwjjVPoEA}D",10.5,1],["_xgeF`jjjVzBA",8.5,1],["}rgeF|ijjVtB@",9.8,1],["eogeF`fjjVw@g@cAy@",8.8,0],["_tgeF|ajjVw@gA_A}A",5.3,1],["wxgeFjijjV@_L",8.0,1],["i}geFx{ijVtA?",12.2,0],["{}geFb{ijV@oF",7.9,1],["kygeFxyijVy@cBw@qB",11.5,1],["c}geF`jjjV`B?",5.3,0],["w}geFjijjVAyC",15.4,1],["y}geFzcjjV?kF",5.8,1],["ybheFlijjVC{K",5.7,1],["wgheF~ekjVA{K",5.5,1],["ygheFxwjjVA_L",5.4,1],["ggheFdjjjVzBA",11.0,1],["wbheFvwjjVA_L",10.5,1],["w}geFttjjV?_I",13.1,1],["gbheF`jjjVzB@",10.0,0],["cbheFlxjjVzBA",7.2,0],["a}geFhxjjVdA@",9.8,0],["abheFxnkjVzB?",6.0,1],["yeheFbzkjV|A_@",6.2,1],["cgheFvtkjVxB?",7.4,1],["}aheF|xkjVh@G|@E",6.6,1],["ucheFl~kjVtAUfAIhA@",6.4,1],["ubheFlcljVf@M`AKrAA",6.9,1],["gaheF~gljVvAMl@H`@C",6.6,1],["_{geFtgljVdANfABt@B",5.4,1],["m`heFviljVj@_@f@U",8.2,1],["}}geFzmljV^U^Il@Dl@F~@FdAB",5.8,1],["_tgeFpmljVv@@rAIl@M`@?ZD",6.2,1],["}sgeFhhljVbA@~@M`AIt@DfAT",5.5,1],["u_heFxrljV~H?",7.7,1],["esgeFxrljV~HA",6.7,1],["{tgeF~wljV_A@aAHq@H",10.8,0],["g{geF`~ljVl@EtAQhAC",13.7,1],["swgeFvbmjVrA?",14.3,1],["mtgeFdbmjV@mC",6.2,1],["{sgeFf}ljV~@@vBRl@Ap@Kh@O",9.1,1],["}sgeF|wljVrAD`AJv@DX?PC",7.6,1],["ikgeFpmljV^XVb@Ph@D^",5.2,1],["ecgeFx}ljVkAK_AM",5.5,0],["elgeF~ymjVsGgD",12.1,0],["ywgeFzumjVLCx@e@",9.2,1],["wtgeF`tmjVh@_@b@Of@Ep@Hb@J|BjA",10.8,1],["cxgeF`umjVVuC",13.3,0],["wvgeFzomjVd@W`@Sj@Kp@E|@BpBLlADr@P",14.4,1],["cogeFjimjVdA?",15.5,1],["mpgeFrbmjVlCAXF",10.4,1],["sjgeFdcmjV~DdA",8.9,1],["_pgeFjcnjVwBwBgAw@yA}@",11.7,0],["cxgeFxwmjVjI|E",12.4,1],["urgeF`gnjVeAmAqAsAeAy@",12.8,0],["_`heFrwmjV|Ap@jBbA",10.6,1],["{}geFjtmjVZD|BrA",16.6,1],["{bheFjzmjVTe@n@u@",9.3,0],["e`heF|vmjV`@i@N[",9.0,0],["_~geFrsmjV|@yBV{@Da@?u@Io@",9.2,0],["{gheF|ymjVdCZ",7.2,1],["mdheFh_njVLcANs@",7.8,0],["aeheFtvmjVTUf@gA",10.0,0],["obheFvrmjVnB{DF[@q@",11.4,0],["k_heF`gmjVOoB@M",11.4,1],["u~geFxgmjVrAh@",7.1,1],["u{geFjhmjVEo@@c@Ls@",8.4,1],["cwgeFfomjVBgAGu@O{@KY",7.9,0],["qxgeFvgmjViA}B",7.9,0],["o{geFnbmjVE{B",18.4,1],["_~geFzonjV][cAw@uAs@kA_@",6.1,0],["ofheFxinjVXeC",7.2,0],["meheFpdnjVXeC",7.9,0],["qygeFjmnjVeAiAeA{@uAy@oBw@]I",5.1,0],["cnheFz}mjVRPXHdA?x@Ff@DlAP",6.2,1],["ylheFbvmjV~A|A",12.8,1],["soheF~cnjVlEHbBR",5.6,1],["snheFthnjV?a@GYW_@Sg@",9.3,0],["mpheFjcnjV?u@Bk@La@`@i@",7.1,0],["enheFninjVbCF|AP",5.4,1],["kgheF~onjVv@T|@b@x@l@",6.0,1],["adheFxwnjVqAs@y@W",6.1,0],["aoheF`tnjVDgC",8.4,0],["{nheFjnnjVFoC",8.5,0],["eoheFrynjV@kC",5.9,0],["moheF`_ojVDiC",6.7,0],["uwheFbdojVBoC",5.3,0],["owheFr~njVBiC",6.4,0],["iwheFdynjVBiC",5.2,0],["_wheFlnnjVDcC",7.2,0],["iaieF`_ojVC}B",7.4,0],["oaieF|ynjVEiC",6.7,0],["waieFjtnjVCsB",7.3,0],["_bieFrnnjVCkB",6.6,0],["wwheFbonjVqCJ",5.5,0],["owheFzinjVyCJ",6.3,0],["ebieFzinjVEcC",8.8,0],["wvheF`injV?iBCu@Iw@",8.5,0],["}vheFt`njVzCyE",7.8,0],["{nheF`}mjVkAwA",9.2,0],["}gheFzrljVhB?",11.8,1],["scheFzrljVbB?",7.4,1],["q`heF`{ljVz@eB",11.6,1],["{gheF`nljVZaAl@w@h@c@bAY",8.1,1],["gjheFhhljVx@w@bAo@tAi@",9.8,1],["ikheF|bljV~@q@rAq@`A_@",11.4,1],["_lheFp}kjVfAq@xAm@",10.0,1],["gkheFvvkjVr@\\~@j@TT",6.1,1],["ylheFf}kjVEiAAqC",7.2,1],["klheFtfkjV~B?",8.6,1],["cmheF`fkjVAaL",6.0,1],["emheFvwjjV?wG",7.5,1],["okheFlxjjVbBA",8.1,1],["gmheFbnjjV?kB",7.1,1],["{gheFjijjVA}K",8.1,1],["igheFz{ijVzBA",5.1,1],["ijheFz{ijVx@?",11.7,1],["slheFrmijV`CA",21.4,1],["ogheFpmijV|B@",11.6,1],["slheFj_ijV~B?",16.9,1],["ogheFj_ijVr@?",8.2,1],["mhheFvwhjVeAgDe@cB",5.2,0],["mmheFrphjV@{ADm@",6.6,1],["qfheFlpmjVp@yAXo@Hc@Bm@",8.9,0],["ucheFtgmjVGw@Qu@Yq@KM",7.4,1],["{tieFtknjVxAcH",6.1,0],["eqieFfpnjV^iC",8.5,0],["yoieFzjnjVf@mB",8.1,0],["_vieFtlnjVyCcDw@eA",6.3,0],["mtjeFv`ljV|C|A",7.3,1],["wnjeFxbljVj@{B",13.3,0],["{ljeFt}kjVHq@Eq@Ic@",11.0,0],["stjeFrdkjVIoBDs@Ty@d@kANe@",8.5,1],["oojeFnckjVv@E",9.2,0],["_jjeF|ykjVuAg@",8.9,1],["uijeFdykjVIu@CoA",7.6,0],["{ljeFrckjV~A~@",11.2,0],["{pjeFpqjjVfBJ",9.3,0],["oljeFrqjjVp@[`@c@Zm@Pu@HaAC}@Kc@MS",11.4,1],["kejeFfpjjV`@oBZyAN[",7.7,0],["qgjeFzyjjV{@oB",14.4,1],["iijeFrujjVf@e@",6.2,1],["emjeFtbkjVt@gB",5.6,0],["ybjeFfckjVw@mB",13.7,1],["eejeFn~jjVs@cB",14.7,1],["kdjeF|~jjV\\Wj@Sn@M\\G",7.8,0],["cbjeFnckjVd@Wl@Md@E",5.0,0],["y}ieFrakjV?oA",11.9,1],["_djeFrxjjVbA[|BI",12.8,0],["ibjeFxhjjVnAr@",13.0,0],["omjeFzujjVJmB",9.7,1],["m`jeFbrjjVX?|@E",13.2,0],["wljeFn~kjVj@^^^",7.8,0],["_jjeF`aljV^f@Zv@",9.0,1],["wijeFnrkjVfBIJCBQ",15.6,0],["cfjeFxpkjVIaD",6.0,0],["ofjeFhgljVi@wA",5.5,0],["kgjeFrmljVhA_A",23.9,0],["qhjeF~mljVmBgE",5.5,0],["sejeF`vljVQoAW_Ac@wA",8.3,0],["}cjeFzuljV[y@]m@",6.5,0],["qbjeFroljV[w@_@aA",5.6,0],["_|ieF~sljVA_@Me@Y[[Q_@A",29.9,0],["gbjeFzxljVf@?l@Gd@SVQJ?",13.2,0],["i}ieFp}ljVh@iB",11.4,0],["e|ieFlyljVKSI_@",12.3,1],["gyieF`{ljVc@Kc@S",14.6,1],["{xieFpzljVB_@ZiB",12.2,0],["a~ieFb~ljV[Bu@T]AWWMk@A_B",7.2,1],["uzieFlmmjVs@Is@[u@w@o@uAWy@",5.8,1],["eyieFvxmjVtA{C",11.2,0],["yuieF~qmjVmB}B",10.9,0],["auieFf`mjVcAv@m@|@SJUGIUBi@j@eE",12.1,1],["}uieF`gmjVyBTm@KYUWc@Is@FiABo@EYMW",6.4,1],["upieF`lmjVhC]",5.6,1],["{ajeFlvmjVQcD",6.7,0],["_tieFjzljVPeCBaC",13.1,0],["}sieFh_mjVZSl@Wd@E",14.5,0],["g`jeF`~mjVUoASiAEm@",6.7,0],["iyieFlanjVg@gAw@iCWg@",7.3,0],["cxieFnanjVVg@xBqEtBcF",8.7,0],["ylieFhcnjVt@oB",7.1,0],["ojieFx~mjVl@oA",7.5,0],["qhieFh{mjVb@yA",11.2,0],["ggieFxwmjVHw@GeA",6.2,0],["ghieFt{mjVdAg@",7.7,0],["mcieF~~mjVEkC",8.6,0],["}aieFx~mjVEeC",9.3,0],["ybieFjcnjVOK?]A}@",8.9,0],["gbieFdcnjVJOBa@Cq@",9.7,0],["onieFhqmjVvBe@`@A",7.4,1],["wnieFrpmjVbBaD",8.6,0],["{jieFljmjVxA_C",10.3,0],["wnieFtemjVnC[v@Sf@Q",8.3,1],["{sieFr`mjVvCDf@Ef@Y`@g@h@Yz@Wh@CXO",7.0,1],["epieFz|ljVCaALaA",7.3,0],["yoieFdxljVHkA@{A",21.0,0],["ooieFfrljVEeCFo@Nq@",15.2,0],["}mieF|gljVd@wG@}AHW",9.3,1],["ixieFzpljVCuAHc@d@cAl@y@d@a@n@cAZm@h@iBFg@",24.5,0],["oiieFxqljVOm@Ei@Dq@L_A@yDAoB",10.8,0],["oeieFryljVNuA?o@c@}DMiABa@H]?c@KoABu@N_A?a@IiAQu@Om@",8.3,0],["eeieFv{ljVd@Yf@Oh@Kr@@",10.7,1],["ggieFjemjVf@w@DUt@u@",7.2,0],["{aieF~fmjVK_@Ii@Cy@M[",10.0,1],["scieFp`mjVjBuB",6.0,0],["aaieFxfmjVNaAXm@|@_A",7.8,0],["i`ieF|mljV[Wa@g@Sq@GcAF}@Je@",6.7,0],["kaieFxaljVc@uB",9.2,0],["cpieFf|kjV@e@D]RYd@i@",26.4,1],["amieFxvkjVAa@Ka@[a@s@u@",5.4,1],["_gieFl{kjVP[d@]PWA]Uy@",5.9,1],["wfieFnnkjVEe@S_@a@g@Oc@",14.8,1],["kkieFnokjVbCA",10.9,1],["urieFbokjVWm@Qq@Ee@BW",12.3,1],["{rieFfjkjV`Bz@VFTETY",15.5,1],["imieFdjkjVAaF",15.6,1],["}sieF`ikjVEYu@uAY_@",6.3,1],["ayieFfhkjV\\An@DXDd@R",10.4,1],["auieFd|jjVhBO",14.8,1],["kcieFtikjVXYVe@d@yA",17.0,1],["_hieFb`kjVBr@J\\NXZNXBXE",15.7,0],["{hieFl_kjVu@BME]u@",22.4,0],["ilieF||jjVYm@",11.1,1],["ahieFv~jjVIkD",19.2,1],["{gieFrxjjV`DA",14.2,1],["{aieFj{jjVSAAcA",21.0,1],["ebieFpxjjVlB@",8.4,1],["avieFvxjjV_@@uCc@g@G",8.5,0],["quieFjxjjVA[Iq@?o@",8.7,1],["u{ieFbrjjVfDr@",8.6,1],["g}ieFrljjVr@@`ALv@RhAb@",5.2,1],["ytieFnnjjVz@iC",5.5,1],["i{ieFpgjjVj@Ip@Ht@Xl@Vr@R",5.4,1],["{wieFxfjjVs@kC",5.5,0],["qrieFrijjVfA}A",7.6,1],["qpieFdyjjV@]_@mAG_@?_@Lo@",9.2,1],["spieFdpjjVZo@n@e@TI",7.2,0],["ooieFzejjV\\Sd@Kf@@XNXRVf@XZb@RXF",8.5,1],["ciieF~wjjViAu@Y[Oe@Aq@Lk@\\_@d@S",11.5,0],["kbjeF|gjjV`@aAr@y@Ny@f@iDZmB",5.9,1],["qoieFr}ijVl@Fr@Hh@GTa@",12.4,1],["ekieF~{ijVYKQYEe@Fi@",13.8,1],["keieFdajjVl@s@n@aAd@i@VC",8.0,0],["}_ieFpajjVA}C",5.4,1],["afieF`ijjVd@IVM`@c@^m@",7.0,1],["waieFdejjVr@qA",6.9,1],["ifieF|{ijVj@w@p@_BRs@",5.1,0],["_`ieFl{ijV?qF",13.7,1],["yaieFpsijVf@?",6.1,0],["_`ieFzrijV?e@Fi@Na@Be@",20.5,1],["sdieFvmijVUACq@Zq@x@oA",19.0,1],["mbieFjgijVZgCC]",11.3,1],["ebieF`hijVLHjAeA",8.6,0],["a_ieFbmijVA_CDsA",14.6,1],["q~heF`hijVx@g@\\C",6.5,0],["ezheFrfijVxAA",11.1,1],["s~heFtmijV~AC",7.1,0],["o{heFnxijVBqDByC",17.4,1],["g|heFtdjjVw@}@OI_@?",7.2,0],["sxheF|{ijVl@?",30.8,1],["{vheFnuijV?iF",15.0,1],["}yheFrmijVtA?",12.8,1],["{vheF~lijVA}D",10.7,1],["w~heFfeijVt@_DPw@",11.3,0],["o|heFn_ijVREb@@",14.2,0],["}xheFv_ijVn@E",15.1,1],["{{heF~whjVxBd@",15.8,0],["yvheF~xhjV?uCCQeCi@",14.9,1],["a|heFllhjVdDr@",17.4,0],["_{heFdghjVzBj@",12.9,0],["muheFdqhjVnA@",12.6,1],["mvheFn_ijVrBA",17.6,1],["krheF`vhjV?iC",12.4,1],["{qheFfqhjVtBA",15.1,1],["irheFnphjVCuE",12.4,1],["utheFdihjVZHZ?",13.2,1],["krheFzhhjVAiC",8.7,1],["_zheF`bhjVlB^",11.4,0],["_vheFfchjV|AZ",6.2,1],["uqheFn_ijVnBA",21.9,1],["kvheFvmijVpBA",18.1,1],["erheF~lijVAsE",9.9,1],["sqheFrmijVlB?",18.3,1],["erheF~qijVA{B",12.5,1],["mvheF|{ijVtBA",22.8,1],["crheF`njjV?uC",11.0,0],["uvheFtsjjV?wI",15.7,0],["oqheFtnjjVjBC",7.9,1],["sdieFjujjVz@A^EzA?",9.7,1],["oeieF~qjjVz@ERUN_@?[Ee@?s@Fk@b@kALY?WE[",5.6,0],["e~heFjtjjVAaEDi@Ng@x@}AJe@?a@Ga@",9.4,0],["e~heFxwjjVAgA",7.3,0],["w}heFpxjjVpEA",7.4,1],["g{heFzwjjVAiA",7.4,1],["uvheF|wjjV?mB",13.7,1],["avheFpxjjVnBC",5.5,1],["_rheFxwjjVAeE",9.4,1],["kqheFjxjjVjB@",6.6,1],["_rheF`fkjV?_L",7.4,1],["qvheFhekjVCiK",14.1,1],["m{heFd|jjVN_@@e@QKEQ",23.2,1],["g{heFndkjV?oDG[c@_@a@q@q@E",9.8,1],["uzheFvfkjVnBA",24.1,1],["_vheFxfkjVlBA",21.9,1],["ivheFnvkjVEeACwD",9.0,1],["o_ieF|nkjVC{BNeA",6.3,0],["_vheF~tkjVpBC",21.9,1],["kqheFvfkjVhB?",9.9,1],["iqheFztkjVpB?",14.1,1],["ewheFdvkjVu@{A",7.8,0],["y`ieFzaljVH]C_BH_@Ve@rA{ANa@?c@Ia@u@sA",5.2,1],["{|heFtcljVJk@FiARu@b@i@ZQ^It@m@",9.4,1],["_vheFt_ljVK_AAyA",9.5,0],["s_ieFnmljVKq@Aa@F_@T_@TO",12.4,1],["_~heFngljVBg@Ty@",7.1,0],["o}heF~gljVh@Qj@_@l@u@d@cA\\a@\\W",12.2,1],["{zheFzlljVp@k@p@{@f@aA`@g@TO",11.9,1],["stheFxdljVQw@",6.8,1],["iuheFh`ljVhBc@",9.4,1],["_qheF`_ljVpBS",6.1,1],["glheFnaljVKyA",7.1,1],["wsheFjeljV|@UbD[",9.0,1],["crheFhjljVn@K`D_@",11.9,1],["osheFzgljVS{@",8.6,1],["s{heFfrljVPoA",6.3,0],["_{heFprljVf@Mp@[h@i@p@wAd@s@`@W",8.0,1],["ksheFntljV@m@Nu@T]VO",7.8,1],["spheFroljV`AQbCS",11.0,1],["qmheFvtljVv@DnAX",7.2,1],["{hheFbuljVC}@MwAIk@",7.4,1],["wrheFfuljVtAKt@E",7.0,1],["yoheFp{ljVo@y@a@q@W_A",9.2,1],["syheFzwljVv@]~@Y|@S",11.0,1],["w}heFpzljVf@]|@g@",10.1,1],["e}heFt`mjV`@_@`@OvAWZBr@f@",7.4,1],["yzheF`emjVZK`@SZUd@s@`@U",6.6,1],["ayheFhyljVND`@FVJRX",5.5,0],["muheFb|ljV\\|@Jb@@V",6.9,0],["qqheF|gmjV[m@Uq@",9.9,0],["qsheFv`mjVh@B~@R",9.6,1],["uoheFz`mjVG_@Bq@Hm@",9.8,1],["wnheF||ljVd@d@fA`@h@`@b@b@f@NXB",11.9,1],["glheFtemjVc@_@c@q@",8.8,0],["ypheFhhmjVz@a@V?b@HNCR]",9.6,1],["ksheFbkmjVb@u@XU",7.0,0],["otheFjkmjVOI[y@QI",5.8,1],["o|heFnlmjVXGRSZq@^O",7.5,1],["u`ieFhmmjV^Oj@Gd@A",7.6,0],["gaieFxlmjVJg@Bo@Es@",15.5,0],["a`ieFxymjV|@@f@Hh@Xb@`@",7.6,1],["_qheF`wmjVmA}A",15.6,0],["orheFnrmjVX]jAwCXS^@VVZ\\RB",9.2,0],["qjheFnmmjVZc@`@Sf@GROl@k@",8.7,1],["kkheFdfmjVnAHr@Hn@XVR",10.2,1],["wqheFdumjV`@k@\\m@^}@TILPRZZD`@Kb@]",7.7,0],["mfieFpumjVj@Kd@S^[~@iA^Ub@?|@J",7.8,0],["y{heFdqmjVb@?b@U\\c@b@IXLPZ",8.3,1],["yboeFfpljVrDM",9.8,0],["meoeFlwljVvCI",5.7,0],["y_oeF|vljVzCG",6.5,0],["kzneF~uljVE}C",12.3,0],["g}neFziljVtDM",22.8,0],["w{neF~cljVpAE",10.9,0],["g_oeF|zkjVrCY",15.3,0],["aeoeFb|kjVvC]",13.8,0],["wxneFnbljVIe@YyE",10.1,1],["_zneFdykjVKgB",8.4,1],["qzneFxtkjVQoC",8.0,1],["}yneFlukjV|JmAtAdBDNGRaCd@",7.2,0],["gyneFxykjVrGc@",15.8,0],["qrneFx}kjVrA{C",10.3,1],["quneF`aljVIiA",18.4,1],["irneFl~kjVjD?fAD",9.4,0],["_jneFt~kjVvEP",20.8,0],["owneFbeljVV@n@LdABtAd@b@Bj@ZzAvAb@z@NdAE~Bo@vDFZRNZGJ[LyAPiAt@mBLi@?u@Ec@Di@p@yBXa@^K`@DXVd@~@h@bAZTd@@ZMVe@Py@JcA",11.4,0],["usmeFzcljVg@S]]Q_@QqA",29.6,1],["ewmeFn}kjVIcAE{@",15.1,1],["swmeFbxkjV@]l@mANW",11.4,1],["}pmeFjxkjVaBgD",13.3,1],["csmeF~{kjV]]aB{@",15.1,1],["snmeFxfljVW]m@Y",22.1,0],["cnmeFveljVaA}D[o@",9.1,1],["qemeFzlljV_@EYFi@\\_@BYMSa@Ci@b@eEEeAc@}C",6.0,1],["wmneFfimjVu@gD",8.8,0],["woneFtbmjVm@mD",10.3,0],["cmneF|imjVfIY",5.3,0],["ebneFjhmjVGwD",14.9,0],["qbneFxamjVKg@OOQIu@E_EW",6.2,0],["}tneFjjmjVlEK",9.3,0],["cyneF~cmjVxGS",12.5,0],["myneFh}ljV`EEl@G",19.2,0],["azneFp|ljVGgD",5.8,0],["o_oeFv}ljVxCI",5.7,0],["ixneF|dnjVEkD",5.1,0],["omneF`pmjVGiD",7.8,0],["}lneFj}mjVGgD",5.8,0],["yjneFnlojVIsD",5.3,1],["suneFxapjVGkD",5.4,0],["wtneFnipjVnI_@",5.8,0],["_jneFz`pjVEcD",5.0,0],["aqneFl{ojVdEM",6.8,0],["{rneFztojVpFQ",5.7,0],["sjneFjsojVEmD",7.2,1],["gjneF`zojVG_D",6.2,0],["goneF~apjVpCI",7.7,0],["}hneFhhpjVhIa@",6.1,0],["kineFtapjVjIY",10.4,0],["_~meF~epjVGkC",10.6,0],["i~meF|_pjVG_D",8.2,0],["qineFzzojVfIU",11.7,0],["{ineFdtojVjIS",10.5,0],["cjneFdmojVfIU",12.0,0],["mjneFbfojVhIU",12.3,0],["yjneFn_ojVlIW",10.1,0],["{~meFheojV~@EVS",14.6,0],["c_neFr~njVlCG",9.4,0],["}}meF`zojVjIU",10.6,0],["s}meFv`pjVjDK",8.8,0],["g}meFbgpjVhIW",5.1,0],["krmeFlepjVEuC",9.9,0],["srmeFd_pjVGcD",19.7,0],["}rmeFnxojVGiC",10.7,0],["ozmeF|pojVVgC",8.0,0],["sxmeFpgojVV_A\\e@",9.9,1],["kumeFzbojVT[La@Dg@Aa@",10.5,1],["{ymeFh~njVfDI",15.4,0],["ovmeFjoojVSBUIY_@Sc@",10.6,1],["{rmeF|lojVf@GZOLQFQ",10.4,0],["gxmeFlhojV~C}@",10.0,0],["wrmeFrfojVb@NZXP\\",9.4,0],["wrmeFzeojV`@Ub@i@",7.6,1],["yomeFrbojVH]@k@C_A",12.2,1],["qsmeFx}njVvBG",16.6,0],["gpmeFpnojVoB[",6.5,0],["{_neF|}njVEeD",9.5,1],["cfneFvqnjV~CK",10.1,0],["}gneFbknjVrEM",11.0,0],["_lneFrdnjVhIU",7.6,0],["klneF~}mjVnIW",5.8,0],["m_neFzwnjVjIS",13.8,0],["etmeFf}njVGgD",6.9,1],["w_neFfqnjVjIW",11.2,0],["_`neFrjnjVlIY",8.7,0],["o`neFzcnjVrIS",7.5,0],["s`neFb}mjVjIS",9.8,0],["sumeFn{mjVIcD",10.8,1],["saneFvumjVGeD",6.6,0],["}aneFxnmjVE_D",8.9,0],["ahneFfpmjVlDM",6.1,0],["ganeFvomjVjBE",14.5,0],["}umeFvtmjV?{@Sk@G[DYnBgC`Bg@|@[~BqAjEOz@Ph@Rh@@d@Q^U",15.1,0],["_}leFjemjVmAcB",14.7,0],["wjmeFp`mjVXIjA?zAPzBT",12.8,0],["m`meFz`mjVq@}@]]w@_@SSCO",18.6,0],["_emeFh{ljV^Cb@WZa@r@iBF]",10.3,0],["{`meFzrljVy@m@Y_@Ua@?k@",17.9,1],["wcmeFtmljV~@ZbA`@",5.6,1],["{zleFf{ljV{@kAOa@A_@@_A?Q",15.6,0],["i_meFtamjVd@m@",11.4,0],["a}leF`_mjVfA}A",13.7,1],["w}leF~~ljVcAwA",16.3,0],["oaneFbimjVdAEb@[LW@g@Ec@MYa@UKUHSTC`@Af@Mb@CT?HQ?SIQ",17.2,0],["a|meF|`mjVNYNO",35.1,0],["apmeFb`mjVX]`@s@RQ",22.1,0],["gxleFp~ljV_AmA",13.9,0],["swleFf~ljV`@eC",9.9,1],["axleFbmljVYg@m@g@oD_BeA]",7.3,0],["wfmeF`hljVPyCXgA",10.4,1],["udmeFt`ljVrAh@",9.7,1],["obmeFbfljVDe@PaA",11.4,1],["}`meFjbljVnCd@",6.1,1],["akmeF`}kjVTC^LpBrA",8.0,1],["{`meFx~kjVmAg@_Am@}@o@o@UiAU",9.4,0],["_nmeF~ukjVx@IVGRW",13.2,0],["{cmeFhwkjVbAr@ZHtD`@VALIJa@h@gCTsBNW",8.9,1],["kuleFfukjVAm@Em@YeA",6.1,0],["{wleF|`ljVh@_E",13.8,0],["}xleFtaljV}@i@i@Oi@Ge@Ai@K",8.8,0],["smleFnoljVcAFYAKMYkAKy@Eo@DU",11.3,0],["uqleFjhljVNI|@C",5.5,1],["ooleFdeljV}@@w@I}@U{A{@",10.3,0],["ujleFzfljVY_@e@Si@CY?",8.3,0],["mhleFbzkjVLaC@m@Cw@",15.5,0],["yhleFpqkjVwCiAg@]u@u@WIW@UD",6.8,0],["ehleF`qkjVAqB",14.9,0],["{lleFxnljVVw@Jk@Ae@Ko@U]WC_@E",10.5,0],["kqleF`lljVp@IJHFb@",10.3,1],["ybleFhskjVcAGy@OWK",7.0,0],["}aleFhskjVbCAl@Mr@?",9.4,0],["_zkeF|skjVAbDKNuAAw@UwAA",10.0,1],["slleFnwljVDc@x@eEZ{AF}@Es@O{@",9.4,0],["atmeFjpnjVjIU",13.3,0],["ktmeFvinjVjIU",12.0,0],["stmeF`cnjVhIY",10.9,0],["{tmeFj|mjVfIU",12.1,0],["utmeFl_njVr@CVD~CG`@Kv@E",11.7,0],["uimeFlanjVE_D",6.5,0],["gimeFp{mjVfIW",6.7,0],["_imeFdbnjVhIW",8.9,0],["iimeFbhnjVGcD",5.7,1],["khmeFronjVhIY",13.3,0],["shmeFzhnjVfIW",10.2,0],["k}leF~mnjVGeD",14.0,1],["u}leFhgnjVGcD",8.4,1],["whmeFpunjVEgD",5.3,1],["_hmeFlvnjVhEQ",15.7,0],["ysmeFdwnjVlIU",15.0,0],["comeFn}njV~DM",17.4,0],["mhmeFj|njVEiD",9.7,1],["ghmeFl_ojVAu@",24.1,1],["ygmeF~|njV|CK",17.6,0],["cbmeFbznjVVsB",10.0,1],["_ameFhunjVZ}@Re@",9.8,0],["a_meFpqnjVd@k@LQ",11.3,1],["inmeFnhojV^qA\\w@\\_@b@Od@Cv@@x@?",11.4,0],["ehmeF~aojV?_@",21.0,1],["}cmeF~aojVRe@Nq@Fk@?Y",10.6,1],["cemeFzkojVkAh@g@?[MWYs@e@aAc@",10.0,1],["almeFjqojVu@k@q@a@",5.7,0],["_omeFdsojVlAURG",7.9,0],["igmeFvwojVE{B",17.7,0],["}fmeFfsojVjA_@",7.1,0],["abmeFnpojV|@gAr@eA`@e@b@Y",11.9,0],["}cmeFdkojVn@c@h@]f@BhA?",9.6,1],["mdmeFzjojVVm@b@cAVm@\\o@",10.7,0],["scmeFvbojVf@DTFNJ",13.3,0],["m~leFnbojV@yAHoAJgA",10.5,0],["k`meF|cojVn@Q",5.2,0],["s`meFnhojVRa@TSZEZC",5.4,0],["s{leF~vojVGeD",10.5,0],["qzleF|oojV?aAHKfAK",11.5,0],["wfmeFpdpjVEuC",13.2,0],["_gmeFj~ojVGaD",16.5,0],["a{leFvcpjVGwC",10.0,0],["k{leFr}ojVEeD",14.7,0],["moleFzbpjVEsC",5.7,0],["soleFv|ojVEeD",9.5,0],["}oleF`vojVGeD",12.7,0],["gpleFjoojVIsD",15.3,0],["soleFplojVrGUr@@",7.0,0],["yoleF`iojVbIU",6.5,0],["y{leFxiojVhAE",5.9,0],["ooleFbpojVfIU",6.9,0],["eoleFvvojV`EM",9.7,0],["coleFbzojVnDK",7.9,0],["}nleFn}ojVlEO",7.9,0],["snleFxcpjVdIU",5.0,0],["wcleF~apjVEqC",6.0,0],["adleF|{ojVGcD",12.9,0],["idleFduojVGaD",13.9,0],["sdleFlnojVEiD",15.0,0],["cyleFx}njVC[Jg@Zq@f@]",7.2,1],["q|leFrnnjVbIY",11.4,0],["iqleF`vnjV`CaAXQRi@Bs@",9.1,1],["aqleFtmnjVjDKP@",10.5,0],["_gleFdvnjVe@QeAOi@?{@FMC",9.4,1],["wqleFrynjV]gA",13.2,1],["wtleFv~njVb@]fAgA",9.8,1],["muleFvcojVj@MxBk@",7.2,1],["mfleFxgojVi@@WMO]Uw@Ye@k@c@m@QeA@",5.7,0],["soleFfaojVXUb@S`@EjANnA`@f@N",8.9,0],["qlleFlznjVd@@`@DTGROPY",6.1,0],["ehleFrxnjVp@s@",9.7,1],["seleFhaojVb@_@NUF_@GYWc@K_@Cu@CsA",13.6,0],["{gleFxinjVj@s@DSAI",9.5,1],["yqleFdmnjVEaD",21.4,1],["a}leF~gnjVjIS",8.6,0],["yeleFtsnjVCk@Gq@Bg@",7.1,1],["kqleFfgnjVjIS",12.5,0],["kfleFtenjVIeD",18.0,1],["uqleFp`njVhIU",9.9,0],["arleFrfnjVEgD",12.0,1],["g}leFjanjVfIU",6.8,0],["krleFx_njVEgB",8.5,1],["wfleF`_njVA_A@[Ns@Xq@",10.3,1],["arleFzymjV|AG",9.4,0],["}ileF`smjVNJXD`@IVS",7.8,0],["efleFxqmjVL_@D]Ck@Oc@E[",10.8,1],["idleFbjmjVRC\\LPJ",9.6,0],["kaleFtqmjVA[?qAIo@E_@",13.3,1],["kfleFtxmjV}@Nk@C}@U[K",7.7,1],["{`leFlrmjVRQp@Yd@Qh@?",7.3,0],["u{keFnpmjVj@Ej@Qj@S",5.7,1],["_`leFtjmjVXCZK^@`@LXB",5.5,1],["izkeFlimjV?cC",12.6,1],["izkeFndmjV@cAHm@Xo@",9.8,1],["qxkeFt}ljV[o@",14.0,1],["iykeFf{ljVbCmC\\Wb@G`@Hl@f@RX",5.7,0],["qwkeFt}ljVTMb@IXA`@D^N",14.8,0],["uykeFtdmjVV_@b@Q`@M`@?TD",15.1,0],["itkeFlbmjVt@aC",13.8,1],["cskeF|kmjVmA_B",5.0,1],["oykeFtimjVt@Y`@IT@",13.7,0],["_ukeFfqmjVi@_A",16.7,1],["i~keFj|mjVCQAmBDU",7.1,1],["a~keFbwmjVNUVC",6.2,0],["c|keFfvmjVx@A`@G^G",9.1,1],["kwkeF`umjVjA_B",6.9,1],["sbleFt~mjVGmECk@",12.5,1],["geleFt_njVdAE",7.8,0],["ableFp_njVhACPGNSPg@",9.8,0],["s}keFt|mjVb@[d@OXE\\D",9.5,0],["{skeFx}mjV^wB",13.9,1],["askeFbymjVw@a@g@]k@g@",13.3,1],["yeleFnfnjVlIY",8.3,0],["mzkeFrknjVIeD",12.6,1],["inkeFlpnjVCyAEeBE_@Kk@",10.6,1],["yokeFtfnjVUw@Ko@Em@Aq@GS",5.0,0],["czkeFrenjV|CK",21.8,0],["utkeFxdnjVBYK_@OQqA_@SBONOFKEKOAUDg@ZqB",12.4,1],["ylkeFzzmjVWSUIUA",20.3,0],["klkeFnzmjVHGN[F_@Bg@",8.9,1],["ulkeFb|mjVRc@^e@\\c@",21.0,1],["gjkeFxwmjV[e@Q_A",15.3,0],["ykkeFrrmjV?k@C]UUUGo@B_@Mg@Ue@i@",9.5,1],["erkeF`lmjVfAqA",5.9,1],["mnkeFximjVP@|AW",8.2,1],["kgkeFzsmjVGYA[VoC",8.8,1],["ohkeFdimjVR?VMNK",11.9,1],["wfkeF|kmjVCo@Ja@Nc@PW",9.4,1],["g~jeFlwmjVwDgF",6.8,0],["kbkeFnzmjVgCuD",10.4,0],["sikeFzwmjVFQbAoA",14.1,1],["afkeFxanjV[ESU@YLk@Bi@Ge@Qg@{@iA",9.9,0],["oakeFnzmjVbBaA",12.9,1],["gekeFtanjV`@[TON]La@R?",8.2,1],["aakeFjdnjVYqG",8.5,0],["qlkeF|`njVIq@Am@",11.6,0],["mfkeFrnnjVGWBQPYTILCBQ",7.7,1],["kwkeFnynjVtCG",19.6,1],["qykeF`ynjVGmD",12.3,0],["_ckeF|~njVcDH",15.1,0],["ankeF`_ojVAmA",23.7,0],["_akeF`xnjVnHU",7.0,1],["uakeFx~njVhIW",7.4,1],["eakeFxeojVhIW",9.1,1],["_ykeFtmojVGkD",21.3,0],["uykeFxfojV_@AQKmBcB",15.9,0],["yeleFfbojV^PZBh@AdAAd@A",5.2,1],["o~keFlbojVfBm@l@Q",7.1,0],["iykeFp_ojVGcD",10.4,0],["ixkeFh`ojVtHQ",18.9,1],["qxkeFlgojVdEM",12.7,1],["uqkeF~fojVjBE",5.2,1],["smkeF`fojVIwD",14.8,0],["gmkeFbmojVIyD",7.8,0],["exkeFnnojVvCI",8.2,1],["i_leF|nojVvDK",5.3,1],["sxkeFjtojVGeD",6.3,0],["axkeFfapjVCkC",10.8,0],["}wkeFbuojVdCI",8.6,1],["_mkeFpsojVGaD",6.1,0],["mlkeFj`pjVEqC",9.2,0],["{rkeF|apjVrDM",5.3,1],["wkkeFjapjVfIW",5.9,1],["y`keFv_pjVGuC",8.2,0],["alkeF~zojVhIW",7.2,1],["aakeFlyojVGaD",11.0,0],["qjkeF`nojVh@BnBC^@pAR",8.2,1],["oakeFbnojVEgB",7.5,0],["ibkeFbjojVcAMu@IgAC",10.5,0],["uakeFniojVEcB",12.2,0],["obkeFreojVgAWq@C",10.1,0],["eakeFhjojVv@BfBCZJNX",6.1,1],["u`keFpsojVjIY",8.8,1],["a`keFr`pjVfIY",5.9,1],["cujeFv~ojVEsC",6.5,0],["k`keFbzojVhIS",6.5,1],["mujeFtxojVEgD",5.5,0],["uujeF`rojVEiD",6.1,0],["gzjeFhlojVrBG",14.3,1],["_vjeFhkojVGoD",7.0,0],["ktjeFt_pjVfIM",5.0,1],["utjeFhyojVdIS",5.9,1],["oijeF`~ojVEwC",6.3,0],["{}ieFd}ojVEsC",6.8,0],["c~ieF`wojVEeD",7.7,0],["wijeF|wojVGgD",6.3,0],["aujeFtrojVpEK",6.2,1],["ajjeFbqojVI_D",14.1,0],["kjjeFnjojVEoD",12.3,0],["_vjeFz}njVjIS",5.2,1],["sjjeFlcojVGmD",6.0,1],["}jjeFh|njVG_D",5.0,1],["krjeF`wnjVnEM",12.0,1],["m~ieFlpojVEgD",5.1,0],["w~ieFtiojVEsD",7.7,1],["}ijeFddojVfIW",12.3,1],["}~ieFnbojVIeD",8.2,1],["ijjeFb}njVhIS",13.7,1],["ujjeFxsnjV|G|B",11.3,1],["aljeFhsnjVsIqC",9.9,0],["cljeFjmnjV}ImC",10.7,0],["akjeF|gnjVmKgD",11.2,0],["cijeFvcnjVuGaFc@MiAE{AK",9.9,0],["ggjeFlonjVwBq@",9.7,0],["{bjeFjqnjVwBu@",7.1,0],["wbjeFdonjVyEiF",5.5,0],["{ajeF`onjVJ}@XkA",8.7,0],["{wjeFjumjV~AH",6.7,1],["}sjeF|umjV`AFd@J",8.3,1],["wojeF|vmjVdBx@",8.7,1],["ykjeFfymjVhA`Ah@`@b@P",10.7,1],["objeF`umjVwB_D",9.5,1],["_ajeF~~mjVi@EwA[",10.2,1],["{fjeFtnmjVGaC",6.8,0],["egjeFjimjVGiBAY",6.3,0],["ygjeF~cmjVW}AEm@@_A",9.2,0],["cgjeFtdmjVj@A",13.9,0],["oejeFzcmjVWmAG}@?{A@Y",6.4,0],["_hjeFn|ljVf@e@^k@",8.0,0],["injeFfbmjVnCgC",20.1,1],["wxjeFbsmjVn@wATe@l@iBr@uBPa@",7.7,0],["cwjeFznmjV`@aAHc@A_@K]a@g@i@u@",8.5,0],["wwjeF~nmjVyBwC",5.5,0],["m~jeFvemjVxAUZM",10.8,0],["_zjeFvcmjV?iE",12.6,0],["mtjeFlcmjVURSCOYMq@Yq@}@sA",7.3,1],["qckeFjxljVeAwA",5.5,1],["gekeFbsljVPgB",5.3,0],["efkeFtpljV^m@Tg@N]",8.3,0],["olkeF`uljVE}BTcC",5.9,0],["qckeFhlljVTSZOj@S",9.6,0],["gzjeFp|ljVyAmB",12.9,1],["}akeF~xljVbCB",13.1,0],["s_keFbjljVpBq@",8.8,0],["a{jeFdhljVXOZ_@Xa@",8.4,0],["qvjeFjrljVXy@b@o@j@u@@MIOa@S}@S",9.5,1],["gqjeFpxljVQr@K`AIf@QLQCOSYWq@g@SW",10.4,1],["mtjeFvbmjVc@qBaAqC",10.7,0],["ujkeFffljV\\}B",8.3,0],["oikeFfaljV\\sBDQ",6.0,0],["wgkeF`|kjVp@yAL]",8.8,0],["i`keFjbljVu@{@aAu@q@c@y@W",6.8,1],["{{jeFhgljVaBkB",8.0,0],["k`keFl{kjV_As@qAs@",12.2,1],["oxjeFrcljVqEaF",5.4,0],["wojeFniljVUYo@[w@[}@a@",6.1,0],["_wjeFnjljV?i@OiB",5.4,1],["oekeFbwkjVD[?kG",6.4,0],["qhjeFd|ljVDkBCc@K[iB{DcBqE",9.3,0],["i~ieFlcojVnBG",17.0,1],["gzieF`cojVrBG",7.1,1],["ixieF`znjVfAuA",16.3,0],["srieFjbojVvBIXGXW",8.0,0],["elieFl_ojVr@wA",6.1,0],["_~ieFhjojVfCG",6.3,1],["eyieF~iojVfCI",15.1,1],["urieFpoojVGgD",19.2,1],["asieFxhojVGqD",8.9,1],["w_jeFxhnjV^{@^m@",10.6,0],["yxieFlwojVzDI",8.4,0],["mrieFbsojVEeA",11.3,1],["sqieFn}ojVxHM",5.5,1],["y`ieF`pojVIgCEgC",5.3,0],["aaieFvdojVAiC",7.4,0],["}cieFptojV`AG",9.0,0],["_gieFhlojVZN^Hr@?",6.6,0],["aeleFxsnjVPUf@Q`@C",9.6,0],["{zheFnoojVAgAGg@WW",6.8,0],["irheFfzojVd@}A",5.1,0],["epgeFhyojVBw@",6.5,0],["apgeFnvojVBqC",5.2,0],["{ogeFtpojVDuC",5.2,0],["iggeFvkojVV@rATP@",7.9,1],["slfeFdxojVYcC",6.7,0],["smfeFxrojVa@cD",5.4,0],["}cfeF~vojVSk@Gw@",5.4,0],["ccfeF~vojVzFmF",5.1,0],["wkfeFzxojVvA?",5.5,0],["gfgeFfvojVBq@Cy@Km@",5.0,0],["amneFzcvjVEkD",5.7,0],["kmneFd}ujVEgD",5.3,0],["uaneFj|ujVGcD",5.8,0],["ccneFvztjVGcD",6.0,0],["kcneF`ttjVIeD",6.5,0],["koneFfntjVGiD",6.8,0],["ucneFlmtjVIgD",6.2,0],["qdneFfysjVIaD",7.1,0],["idneFb`tjVGmD",5.3,0],["{dneFprsjVGeD",6.1,0],["cpneFnmsjVfIW",6.9,0],["{pneFvlsjVGcD",5.2,0],["opneFrfsjVjIU",7.8,0],["eeneFzksjVIiD",6.7,0],["upneF~_sjVnFO",9.8,0],["cqneFhyrjVhIS",6.9,0],["irneFn~qjVfIY",5.5,0],["srneFtwqjVlIS",5.5,0],["khneFpbqjVImD",7.4,0],["ktneF|opjVjI[",5.2,0],["u}meFlmpjVIeD",6.0,0],["a}meFdnpjVjIW",5.9,0],["yqmeFlspjVGgD",9.2,0],["y|meFtqpjVdIW",5.1,0],["oqmeF`zpjVGiD",8.5,0],["ygneFdcqjVhIY",5.3,0],["sgneFffqjVdC?`CMVNh@E",5.5,0],["ogneFziqjVfIY",6.4,0],["{zmeF~|qjVnCK",8.7,0],["qzmeFtcrjVpDM",7.3,0],["aomeFlorjVGcD",6.9,0],["ynmeFdvrjVEgD",5.6,1],["_ymeFnxsjVEeD",8.0,0],["iymeFtqsjVGcD",7.9,0],["cymeFdesjVhIS",5.4,0],["{mmeFhjsjVIaD",9.8,0],["smmeF|psjVGeD",9.6,0],["immeFvwsjVGkD",10.1,0],["_xmeFtltjVGkD",7.7,0],["wwmeFjstjVGeD",7.8,0],["kwmeFhmtjVdBE",8.6,0],["wlmeF`etjVGcD",6.6,0],["mlmeFvktjVGcD",6.2,0],["elmeFprtjVCgD",6.0,0],["qwmeF~ytjVEgD",7.8,0],["ykmeFbytjVGeD",8.3,0],["qkmeFz_ujVEeD",5.0,0],["gwmeFt`ujVGcD",6.6,0],["ujmeF~sujVEeD",8.0,0],["avmeFn{ujVGiD",7.8,0],["kjmeFpzujVEcD",9.0,0],["w~leFzyujVEgD",6.6,0],["}_meF`_ujVGgD",6.3,0],["gtleFh~tjVGgD",5.8,0],["otleFrwtjVIkD",5.9,0],["m`meFvqtjVIeD",8.2,0],["{`meF|jtjVEgD",7.3,0],["aameFbdtjVEcD",5.1,0],["ytleF|ptjVGkD",6.7,0],["muleFnctjVGgD",5.5,0],["kameFt}sjVEiD",5.9,0],["uuleFv|sjVGcD",6.5,0],["sameF|vsjVGiD",10.7,0],["avleF`vsjVEgD",6.0,0],["gvleFjosjVIiD",6.5,0],["}ameFdpsjVGgD",11.7,0],["iameFzpsjVdEM",5.7,1],["qameFdjsjVfIU",6.3,1],["gbmeFpisjVGmD",10.0,0],["qbmeF|bsjVGmD",6.2,0],["{ameFncsjVfIU",7.9,1],["svleFthsjVEiD",6.2,0],["yvleF`bsjVKmD",6.4,0],["abmeFx|rjV`IU",7.7,1],["ymmeFt}rjVfDM",6.6,0],["c_meFzurjVxEM",9.0,1],["wimeFrvrjV|DM",7.8,0],["knmeFdprjVhIW",6.4,0],["ccmeFlurjVGgD",5.1,1],["mcmeFtnrjVEeD",5.4,1],["ywleF|mrjVEiD",6.1,0],["_cmeFthrjV`DK",6.0,0],["{jmeFx{qjVxDI",7.6,0],["_dmeFharjVGeD",7.3,0],["gcmeF`brjVxDM",6.3,0],["gnmeFjuqjV~GQ",8.4,0],["_nmeFpnqjVnGO",8.7,0],["_mmeFzgqjV`FO",7.2,0],["_nmeFbaqjVxFQ",7.6,0],["{dmeFl`qjVrDK",5.8,0],["ypmeFxzpjVhIY",7.8,0],["afmeFnrpjVIkD",5.8,0],["kemeFdspjV~HW",7.3,0],["czleFhxpjVGgD",5.4,0],["uzleFbkpjVIkD",6.3,0],["_zleFrkpjVfIS",7.4,0],["{tleF~qpjVlDK",8.9,0],["myleF|xpjVfIS",9.4,0],["eyleFr_qjVjIS",9.7,0],["{xleFlfqjVrGS",11.3,0],["qxleF`mqjVfIU",9.2,0],["knleF|jpjVhIY",6.3,0],["anleFnqpjVfIS",8.0,0],["{bleFrvpjVEcD",6.7,1],["ymleFdxpjVfIS",9.3,0],["qbleFj}pjVGgD",5.7,0],["qmleFz~pjVhIS",8.1,0],["cmleFreqjVfIW",7.0,0],["cxleFxsqjVdEM",10.3,0],["imleFfrqjVEkD",8.0,0],["amleF|xqjVEcD",7.3,0],["wlleFt_rjVGgD",8.4,0],["elleF`mrjVEgD",7.2,0],["ukleF~frjVdIS",8.2,0],["}kleFj`rjVfIY",10.1,0],["y`leFrerjVEgD",6.6,0],["{kleFtsrjVGeD",5.1,0],["e`leF|rrjVGeD",11.3,0],["o`leFhlrjVIiD",10.6,0],["mkleFxmrjVjIW",6.6,0],["okleFnzrjVIiD",6.7,0],["ekleFbasjVGgD",7.4,0],["}_leFtyrjVGiD",8.2,0],["s_leFl`sjVEkD",9.6,0],["{jleFzgsjVGgD",5.8,0],["g_leFbgsjVGkD",9.0,0],["}~keFzmsjVGmD",7.8,0],["ajleF|{sjVGaD",7.3,0],["ijleFdusjVEgD",5.6,0],["u~keFntsjVEiD",6.1,0],["wileFtbtjVGcD",7.1,0],["oileFhitjVGeD",5.1,0],["eileFbptjVGmD",5.4,0],["{hleFxvtjVGgD",6.1,0],["_hleFzjujVEgD",6.6,0],["ugleFpqujVGgD",5.7,0],["a|keFxpujVGgD",5.5,0],["m{keF`~ujVIeD",10.2,0],["kdkeFzuujVIiD",5.5,0],["spkeFfiujVGgD",10.1,0],["iekeFraujVGcD",7.9,0],["qekeF~ztjVIgD",6.6,0],["ikkeFjutjVvCI",6.6,0],["{ekeFhttjVEiD",6.0,0],["cqkeF`otjVfIU",6.3,0],["yqkeFjntjVGyC",12.7,0],["ofkeF|ftjVGiD",6.4,0],["_skeFpssjVG_D",7.5,0],["kgkeFzrsjVGgD",9.4,0],["ugkeFflsjVGgD",5.6,0],["qskeFhfsjVIkD",12.8,0],["}skeFr_sjVEeD",6.6,0],["ghkeFv~rjVGgD",10.9,0],["m_leFtsrjVfIU",6.1,1],["otkeF`rrjVGaD",11.6,0],["w_leF|lrjVfIS",6.1,1],["ytkeFjkrjVEeD",14.0,0],["u|keF`frjVzEO",7.0,1],["}hkeFhqrjVEiD",11.3,0],["eikeFrjrjVGkD",11.1,0],["wmkeF~drjVrBG",7.4,1],["cukeFtdrjVGeD",15.0,0],["utkeFt~qjVfIS",5.3,1],["mikeF`drjVGkD",8.2,0],["wikeFf}qjVEiD",6.7,0],["mukeFb~qjVGkD",13.9,0],["_ukeF~wqjVfIU",8.5,1],["ajkeFpvqjVGgD",11.7,0],["wukeFlwqjVEkD",12.3,0],["iukeFjqqjVhIW",8.7,1],["kjkeFxoqjVGeD",9.2,0],["upkeFhjqjVlDI",10.4,1],["sjkeFdiqjVGiD",5.2,0],["wwkeFlhpjVIeD",5.3,1],["awkeFdipjVfIU",5.8,1],["ckkeFbopjVhIU",9.2,1],["mkkeFjhpjVfIW",7.6,1],["{jkeFzupjVhIW",9.0,1],["w_keFpgpjVhIQ",8.2,1],["m_keFhnpjVfIW",9.6,1],["wtjeFdfpjVGkD",6.2,0],["g_keF~tpjVjIW",9.5,1],["u~jeFlbqjVjIU",12.5,1],["__keFlhqjVGgD",9.8,0],["ijkeFdcqjVjIS",7.0,1],["ajkeFziqjVlIW",9.3,1],["g~jeF~hqjVhIU",11.0,1],["isjeFtgqjVImD",5.9,0],["uikeFnpqjVlIU",9.8,1],["u~jeF~nqjVGgD",10.5,0],["k~jeFvuqjVGgD",8.0,0],["ubkeFvvqjVrBE",16.3,1],["krjeFp{qjVImD",6.7,0],["i}jeF`}qjVfIU",5.8,1],["}hkeF|}qjV|DK",6.4,1],["uhkeFtdrjVvDM",6.0,1],["w}jeFbcrjVGgD",6.0,0],["c}jeFxcrjVjIW",5.7,1],["crjeFhbrjVImD",5.3,0],["yqjeF|hrjVGgD",8.3,0],["q}jeFxirjVCiD",10.7,0],["e}jeFjprjVGcD",7.5,0],["e|jeF|wrjVhIY",5.6,1],["k|jeFtdsjVEiD",6.6,0],["}{jeFp~rjVhIW",6.1,1],["upjeFvcsjVGiD",5.9,0],["s{jeFjesjVdIW",5.5,1],["a|jeFhksjVEiD",7.2,0],["w{jeF~qsjVIiD",5.4,0],["kujeFv_tjVbDG",5.4,1],["{ujeFlftjV|DK",5.7,1],["evjeFdmtjVrEM",8.2,1],["izjeFrstjVEmD",5.8,0],["otjeFxstjVfDK",5.1,1],["qtjeFnztjVpDK",5.9,1],["kyjeFrgujVGiD",6.7,0],["ayjeFjnujVGoD",7.3,0],["oxjeFt{ujVEiD",17.6,0],["yljeFzzujVGeD",13.0,0],["cajeF`zujVGgD",10.9,0],["wajeFrlujVEeD",7.2,0],["_bjeF|eujVGgD",8.1,0],["w|ieFt_ujVjDK",8.9,1],["_~ieF|xtjVhEK",10.4,1],["ibjeFf_ujVGcD",6.8,0],["i_jeFjrtjVjFO",8.8,1],["_~ieFnktjVvDK",9.9,1],["c~ieFvdtjVrDI",9.9,1],["cdjeF`wsjVGkD",5.5,0],["c_jeF`~sjVfEI",7.6,1],["icjeFvwsjVbIS",6.4,1],["kcjeFntsjV`IU",7.1,1],["scjeF`qsjVdIS",8.5,1],["_djeFjjsjVhIW",9.2,1],["gdjeFtcsjVfIU",9.2,1],["qdjeF~|rjVfIW",8.1,1],["}djeFhvrjVfIW",8.2,1],["eejeFrorjVhIW",9.6,1],["sejeFrurjVEkD",8.5,0],["qejeFzhrjVfIW",8.9,1],["ozieFjgrjVIkD",6.2,0],["{ejeFdbrjVfDM",9.7,1],["wqjeFh|qjVfIW",6.0,1],["_rjeFpuqjVdIU",7.4,1],["afjeFl{qjVfIS",5.2,1],["ifjeFvtqjVbIW",7.1,1],["ufjeF`nqjVvDK",8.9,1],["krjeF|nqjVhIY",7.3,1],["_gjeFjgqjV|CI",6.2,1],["wrjeFfhqjVhIY",6.4,1],["igjeFv`qjVzDO",6.0,1],["}{ieF~eqjVGiD",5.3,0],["qgjeF`zpjVvDI",6.1,1],["asjeFtaqjVlIY",8.0,1],["isjeFxzpjVjIS",8.2,1],["ssjeFdtpjVnIW",7.8,1],["{sjeFlmpjVjIU",6.3,1],["yhjeF`lpjVIkD",6.6,0],["etjeFzfpjVjI[",5.1,1],["eijeFdepjVG{C",5.0,0],["q|ieFrxpjVIkD",5.3,0],["}|ieFxqpjVGgD",6.6,0],["g}ieFdkpjVGkD",6.2,0],["q}ieFrdpjVEcD",6.5,0],["{qieFtcpjVG_D",8.5,0],["qqieFdjpjVEgD",6.8,0],["grieFbkpjVoDL",7.8,0],["uqieFnxpjVwCH",8.2,0],["kqieFf_qjV_EN",9.8,0],["eqieFteqjVk@A",24.6,0],["afieFxsqjV_@y@WuAM[w@c@aAcA",7.1,1],["upieFbeqjVD}@GaB",24.2,0],["{qieF~hqjV^yA",14.7,0],["mwieFhzqjV`CE",5.1,1],["opieFtbsjVfEO",6.6,0],["maieF~msjVC]OsAUm@",5.7,0],["_aieFj{sjVGkCE]",5.4,0],["ukieFfptjVGiD",5.5,0],["}vieFbktjVbEO",5.2,0],["c|heFjktjVJcALcBDqA",5.1,0],["mjheFx`pjVBuC",5.3,0],["_nheF`mrjVzBI",5.1,1],["crheF|gsjVcFP",6.5,0],["}wheFhwsjVjA{@b@OpCK",5.2,1],["kpheFdmsjVgCF",5.9,0],["wlheFfqtjVPkBHW",5.2,0],["edheF`jpjV?sF",5.3,0],["{iheFrapjV`DB",7.9,1],["oggeF|ipjVi@Em@]",5.1,0],["_fgeFxfpjVk@{@",5.4,0],["omgeF~xujVoApAsAv@{Al@",5.3,1],["czeeFxzqjVhDAbHLhAD",5.7,1],["omeeFbvqjVGW?e@BcC",7.5,0],["oefeFzgpjVFcD",5.8,0],["s~eeFd~ojVMeBFQh@c@PC",5.8,0],["g}deFdpojV^ETMp@_A",8.9,1],["{rdeFdpojV}CcA",5.7,1],["{beeFvipjV?mAPiBX}Ap@kBpA{Cl@{An@{Bb@{A",6.4,0],["codeFnuqjVgB?k@O",9.6,0],["ondeF`zqjVD}@GmA",7.3,0],["ondeF~tqjVFWRSXC|@V",9.0,0],["u}eeFpytjVtACxAWpAc@rCeB`BkAbCyAdA[jAQnBM|HSrFQdEI",5.1,0]]};
+}
+
+</script>
+
+<!-- Google Analytics -->
+<script>
+  // (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  // (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  // m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  // })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+  // ga('create', 'UA-42777617-1', 'hillmapper.com');
+  // ga('send', 'pageview');
+</script>
+
+</head>
+<body onLoad="initialize()">
+
+  <div id="header">
+  <div id="header_left">HILL MAPPER SAN FRANCISCO</div>
+  <div id="header_twitter">
+<a href="https://twitter.com/share" class="twitter-share-button" data-url="http://hillmapper.com/"></a>
+<a href="https://twitter.com/hillmapper" class="twitter-follow-button" data-show-count="false"></a>
+  </div>
+  <div id="header_facebook">
+<div class="fb-like" data-href="http://hillmapper.com/" data-width="100" data-layout="button_count" data-show-faces="false" data-send="false"></div>
+  </div>
+  </div>
+  
+  <div id="map_canvas"></div>
+
+  <div id="control_box">
+  	<div class="descript">Colors show which streets are steeper than others.</div>
+  	<ol class="instructions">
+  	<li>Red streets are steep. Blue streets are shallow.</li>
+  	<li>Unshaded streets are flat.</li>
+	</ol>
+  	<hr class="instructions">
+
+  	<div id="detect">
+  		<a class="location_detector">Detect location</a><br></div>
+  	<div id="footer">Made in San Francisco</div>
+
+  </div>
+
+  <div id="alert">
+	  <div id="alert-left"></div>
+	  <div id="alert-right"><input id="alert-ok" type="submit" value="OK"></div>
+  </div>
+  
+  <div id="control_box_mobile">
+  	<div class="action_mobile">
+  		&bull; <a class="instruction_viewer">INSTRUCTIONS</a></div>
+  	<div class="action_mobile">
+  		&bull; <a class="marker_retriever">Retrieve marker</a></div>
+  	<div class="action_mobile">
+  		&bull; <a class="location_detector">Update location</a></div>
+  </div>
+  
+  <div id="instructions_mobile">
+    	<div>Colors show which streets go uphill or downhill when you approach them from the stick-figure location marker.</div>
+  	<ol class="mobile">
+  	<li>Red streets go uphill. Blue streets go downhill.</li>
+  	<li>The darker the color, the steeper the hill. Unshaded streets are flat.</li>
+  	<li>Try moving the marker or updating your location to redraw the terrain.</li>
+  	</ol>
+  </div>
+  
+</body>
+</html>
