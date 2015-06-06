@@ -81,6 +81,7 @@ function initialize() {
 	
 	loadFileAsJSON(filename, null, function(json) {
 		console.log("json loaded" + json);
+		console.log("json locations: " + json["locations"]);
 		drawNewLines(json);
 	});
 }
