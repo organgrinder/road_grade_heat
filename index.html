@@ -418,7 +418,7 @@ function drawNewLines() {
 	var positionalRequest = { 'locations': elevationLocations }
 	console.log("size: " + elevationLocations.length);
 	
-	if (NO) elevator.getElevationForLocations(positionalRequest, function(results, status) {
+	elevator.getElevationForLocations(positionalRequest, function(results, status) {
 		if (status != google.maps.ElevationStatus.OK) {
 			// something went wrong with the elevation request
 			console.log("problem with request");
