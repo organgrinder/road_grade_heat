@@ -72,14 +72,15 @@ function initialize() {
 	
 	setUpMap();
 	
-	loadData();
-	loadJSON(data);
+	// loadData(); // not currently hooked up to load anything
+	// loadJSON(data);
 	updateGradeLineVisibility();
 	activateGradeLines();
 	
 	var filename = "data/lines_sample.txt"
 	
 	loadFileAsJSON(filename, null, function(json) {
+		console.log("json loaded" + json);
 		drawNewLines(json);
 	});
 }
