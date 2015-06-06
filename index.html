@@ -223,6 +223,10 @@ function loadFileAsJSON(filename, cache, callback) {
 		async: true,
 		success: function(result) {
 			callback(JSON.parse(result));
+		},
+		failure: function(result) {
+			console.log("failure for ajax call; result:");
+			console.log(result);
 		}
 	});
 }
