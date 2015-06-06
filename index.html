@@ -82,6 +82,7 @@ function initialize() {
 
 	loadFileAsJSON(filename, null, function(json) {
 		console.log("loaded paths - small elevs");
+		console.log("json: " + json)
 		drawNewLines(json);
 	});
 	
