@@ -354,7 +354,7 @@ function drawElevations() {
 				var lng = Math.round(currLocation.lng() * 100000);
 				var key = "" + lat + lng;
 				segmentEndElev = atlas.elevationPoints[key];
-				if !(segmentEndElev > 0) console.log("end elev problem: " + segmentEndElev);
+				if (!segmentEndElev > 0) console.log("end elev problem: " + segmentEndElev);
 
 				var segmentGain = Math.abs(segmentEndElev - segmentStartElev);				
 				var segmentGrade = (segmentGain / segmentPathDistance);
