@@ -7,8 +7,8 @@ require 'polylines'
 
 
 # data/all_sf_locations.txt is in the form of LNG, LAT
-$locationsFilename = "data/all_sf_locations.txt"
-$elevationsFilename = "data/elevations_first.txt"
+$locationsFilename = "data/hayes_valley.csv"
+$elevationsFilename = "data/elevations_hayes.txt"
 
 $baseURL = "https://maps.googleapis.com/maps/api/elevation/json\\?locations="
 
@@ -24,7 +24,7 @@ def main
   createURLs(locationsJSON)  
   
   # rewrite the file
-  open("data/elevations_first.txt", 'w') { |f|
+  open($elevationsFilename, 'w') { |f|
     f.puts $elevationsDictionary
   }
 end
