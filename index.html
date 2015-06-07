@@ -329,7 +329,7 @@ function drawElevations() {
 		var key = "" + lat + lng;
 		var segmentStartElev = atlas.elevationPoints[key];
 		
-		if segmentStartElev == null console.log("star elev NULL");
+		if (segmentStartElev == null) console.log("star elev NULL");
 		if !(segmentStartElev > 0) console.log("start elev problem: " + segmentStartElev);
 
 		var segmentPathDistance = 0;
